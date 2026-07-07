@@ -17,23 +17,23 @@ CFLAGS = -Wall -Wextra -std=c11 -Iinclude -I/opt/mqm/inc
 LDFLAGS = -L/opt/mqm/lib64 -lmqm -Wl,-rpath,/opt/mqm/lib64 
 
 # Directories
-SRC_DIR = src
-INC_DIR = include
-OBJ_DIR = obj
-BIN_DIR = bin
+SRC_DIR = src/
+INC_DIR = inc/
+OBJ_DIR = obj/
+BIN_DIR = bin/
 
 # ----------------------------------------------------------
 # Target executable
 # ----------------------------------------------------------
-TARGET = $(BIN_DIR)/diserr
+TARGET = $(BIN_DIR)diserr
 
 # ----------------------------------------------------------
 # Source and object files
 # ----------------------------------------------------------
 SRC_FILES = main.c cmdline.c mqutil.c
 
-SOURCES = $(addprefix $(SRC_DIR)/, $(SRC_FILES))
-OBJECTS = $(addprefix $(OBJ_DIR)/, $(SRC_FILES:.c=.o))
+SOURCES = $(addprefix $(SRC_DIR), $(SRC_FILES))
+OBJECTS = $(addprefix $(OBJ_DIR), $(SRC_FILES:.c=.o))
 
 # ----------------------------------------------------------
 # Default target
@@ -49,7 +49,7 @@ $(TARGET): $(OBJECTS) | $(BIN_DIR)
 # ----------------------------------------------------------
 # Compile source files to object files
 # ----------------------------------------------------------
-$(OBJ_DIR)/%.o: $(SRC_DIR)/%.c | $(OBJ_DIR)
+$(OBJ_DIR)%.o: $(SRC_DIR)%.c | $(OBJ_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # ----------------------------------------------------------
