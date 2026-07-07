@@ -14,8 +14,9 @@ TARGET = $(BIN_DIR)/diserr
 
 # Source and object files
 SRC_FILES = main.c cmdline.c mqutil.c
+
 SOURCES = $(addprefix $(SRC_DIR)/, $(SRC_FILES))
-OBJECTS = $(OBJ_DIR)/main.o $(OBJ_DIR)/cmdline.o $(OBJ_DIR)/mqutil.o
+OBJECTS = $(addprefix $(OBJ_DIR)/, $(SRC_FILES:.c=.o))
 
 # Default target
 all: $(TARGET)

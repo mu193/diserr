@@ -11,7 +11,7 @@
      cmdline_cleanup  - Free allocated memory in arguments structure
 */
 
-#define _POSIX_C_SOURCE 200809L
+#define _POSIX_C_SOURCE 200809L // use POSIX.1-2008 
 
 #include <stdio.h>
 #include <stdlib.h>
