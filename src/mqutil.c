@@ -11,86 +11,91 @@
      mqReasonStr  - Convert MQ reason codes to readable strings
 */
 
+/******************************************************************************/
+/*                               I N C L U D E S                              */
+/******************************************************************************/
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <cmqc.h>
 #include "mqutil.h"
 
-/* Initialize MQ connection structure.  */
-void mqInit (mqconn_t *mq_conn, const char *qmgr_name)
+/******************************************************************************/
+/* Initialize MQ connection structure.                                        */
+/******************************************************************************/
+void mqInit (mqconn_t *conn, const char *qmgr)
 {
-  mq_conn->hConn = MQHC_UNUSABLE_HCONN;
-  mq_conn->comp_code = MQCC_OK;
-  mq_conn->reason_code = MQRC_NONE;
+  conn->hConn = MQHC_UNUSABLE_HCONN;
+  conn->cc = MQCC_OK;
+  conn->rc = MQRC_NONE;
 
-  if (qmgr_name != NULL)
+  if (qmgr != NULL)
   {
-      strncpy (mq_conn->qmgr_name, qmgr_name, MQ_Q_MGR_NAME_LENGTH);
-      mq_conn->qmgr_name[MQ_Q_MGR_NAME_LENGTH] = '\0';
+      strncpy (conn->qmgr, qmgr, MQ_Q_MGR_NAME_LENGTH);
+      conn->qmgr[MQ_Q_MGR_NAME_LENGTH] = '\0';
   }
   else
   {
-      mq_conn->qmgr_name[0] = '\0';
+      conn->qmgr[0] = '\0';
   }
 }
 
 /* Connect to IBM MQ queue manager.  */
-int mqConnect (mqconn_t *mq_conn)
+int mqConnect (mqconn_t *conn)
 {
-  MQCHAR qmgr_name[MQ_Q_MGR_NAME_LENGTH + 1];
+  MQCHAR qmgr[MQ_Q_MGR_NAME_LENGTH + 1];
 
   /* Prepare queue manager name.  */
-  memset (qmgr_name, ' ', MQ_Q_MGR_NAME_LENGTH);
-  if (strlen (mq_conn->qmgr_name) > 0)
+  memset (qmgr, ' ', MQ_Q_MGR_NAME_LENGTH);
+  if (strlen (conn->qmgr) > 0)
   {
-      memcpy (qmgr_name, mq_conn->qmgr_name, strlen (mq_conn->qmgr_name));
+      memcpy (qmgr, conn->qmgr, strlen (conn->qmgr));
   }
 
   /* Connect to queue manager.  */
-  MQCONN (qmgr_name,
-          &mq_conn->hConn,
-          &mq_conn->comp_code,
-          &mq_conn->reason_code);
+  MQCONN (qmgr,
+          &conn->hConn,
+          &conn->cc,
+          &conn->rc);
 
-  if (mq_conn->comp_code == MQCC_FAILED)
+  if (conn->cc == MQCC_FAILED)
   {
       fprintf (stderr, "MQCONN failed with reason code %d: %s\n",
-               (int) mq_conn->reason_code,
-               mqReasonStr (mq_conn->reason_code));
+               (int) conn->rc,
+               mqReasonStr (conn->rc));
       return -1;
   }
 
-  if (mq_conn->comp_code == MQCC_WARNING)
+  if (conn->cc == MQCC_WARNING)
   {
       fprintf (stderr, "MQCONN completed with warning %d: %s\n",
-               (int) mq_conn->reason_code,
-               mqReasonStr (mq_conn->reason_code));
+               (int) conn->rc,
+               mqReasonStr (conn->rc));
   }
 
   printf ("Connected to queue manager: %s\n",
-          strlen (mq_conn->qmgr_name) > 0 ? mq_conn->qmgr_name : "(default)");
+          strlen (conn->qmgr) > 0 ? conn->qmgr : "(default)");
 
   return 0;
 }
 
 /* Disconnect from IBM MQ queue manager.  */
-int mqDisconnect (mqconn_t *mq_conn)
+int mqDisconnect (mqconn_t *conn)
 {
-  if (mq_conn->hConn == MQHC_UNUSABLE_HCONN)
+  if (conn->hConn == MQHC_UNUSABLE_HCONN)
   {
       return 0;  /* Already disconnected.  */
   }
 
-  MQDISC (&mq_conn->hConn,
-          &mq_conn->comp_code,
-          &mq_conn->reason_code);
+  MQDISC (&conn->hConn,
+          &conn->cc,
+          &conn->rc);
 
-  if (mq_conn->comp_code == MQCC_FAILED)
+  if (conn->cc == MQCC_FAILED)
   {
       fprintf (stderr, "MQDISC failed with reason code %d: %s\n",
-               (int) mq_conn->reason_code,
-               mqReasonStr (mq_conn->reason_code));
+               (int) conn->rc,
+               mqReasonStr (conn->rc));
       return -1;
   }
 

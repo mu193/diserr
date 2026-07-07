@@ -3,23 +3,25 @@
 
 #include <cmqc.h>
 
-/* MQ Connection structure.  */
+/******************************************************************************/
+/* MQ Connection structure.                                                   */
+/******************************************************************************/
 typedef struct
 {
-  MQHCONN hConn;           /* Connection handle.  */
-  char qmgr_name[MQ_Q_MGR_NAME_LENGTH + 1];
-  MQLONG comp_code;        /* Completion code.  */
-  MQLONG reason_code;      /* Reason code.  */
+  MQHCONN hConn;                       // Connection handle.  
+  char qmgr[MQ_Q_MGR_NAME_LENGTH + 1]; // Queue manager name.  
+  MQLONG cc;                           // Completion code. 
+  MQLONG rc;                          // Reason code. 
 } mqconn_t;
 
 /* Initialize MQ connection structure.  */
-void mqInit       (mqconn_t *mq_conn, const char *qmgr_name);
+void mqInit       (mqconn_t *conn, const char *qmgr);
 
 /* Connect to queue manager.  */
-int  mqConnect    (mqconn_t *mq_conn);
+int  mqConnect    (mqconn_t *conn);
 
 /* Disconnect from queue manager.  */
-int  mqDisconnect (mqconn_t *mq_conn);
+int  mqDisconnect (mqconn_t *conn);
 
 /* Get error message for reason code.  */
 const char *mqReasonStr (MQLONG reason_code);

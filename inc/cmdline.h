@@ -19,7 +19,7 @@
 /* Parsed command line arguments.  */
 typedef struct
 {
-  char *qmgr_name;
+  char *qmgr;
 } cmdline_t;
 
 void cmdlInit    (cmdline_t *args);

@@ -5,8 +5,8 @@
    operations to report on errors and system status.
 
    Usage:
-     diserr -m <qmgr_name>
-     diserr --qmgr <qmgr_name>
+     diserr -m <qmgr>
+     diserr --qmgr <qmgr>
      diserr --help
 
    Options:
@@ -22,7 +22,7 @@
 int main (int argc, char *argv[])
 {
   cmdline_t args;
-  mqconn_t mq_conn;
+  mqconn_t conn;
   int ret;
 
   /* Initialize command line arguments.  */
@@ -37,13 +37,13 @@ int main (int argc, char *argv[])
   }
 
   /* Initialize MQ connection.  */
-  mqInit (&mq_conn, args.qmgr_name);
+  mqInit (&conn, args.qmgr);
 
   /* Connect to queue manager.  */
-  if (mqConnect (&mq_conn) != 0)
+  if (mqConnect (&conn) != 0)
   {
       fprintf (stderr, "Failed to connect to queue manager: %s\n",
-               args.qmgr_name);
+               args.qmgr);
       cmdlCleanup (&args);
       return EXIT_FAILURE;
   }
@@ -51,7 +51,7 @@ int main (int argc, char *argv[])
   /* TODO: Add your IBM MQ operations here.  */
 
   /* Disconnect from queue manager.  */
-  mqDisconnect (&mq_conn);
+  mqDisconnect (&conn);
 
   /* Cleanup.  */
   cmdlCleanup (&args);

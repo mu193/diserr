@@ -24,7 +24,7 @@
 /******************************************************************************/
 void cmdlInit (cmdline_t *args)
 {
-  args->qmgr_name = NULL;
+  args->qmgr = NULL;
 }
 
 /******************************************************************************/
@@ -58,8 +58,8 @@ int cmdlParse (int argc, char *argv[], cmdline_t *args)
       switch (opt)
       {
       case 'm':
-          args->qmgr_name = strdup (optarg);
-          if (args->qmgr_name == NULL)
+          args->qmgr = strdup (optarg);
+          if (args->qmgr == NULL)
           {
               fprintf (stderr, "Error: Memory allocation failed\n");
               return -1;
@@ -81,7 +81,7 @@ int cmdlParse (int argc, char *argv[], cmdline_t *args)
   }
 
   /* Check for required arguments.  */
-  if (args->qmgr_name == NULL)
+  if (args->qmgr == NULL)
   {
       fprintf (stderr, "Error: Queue manager name (-m/--qmgr) is required\n");
       cmdlUsage (argv[0]);
@@ -96,9 +96,9 @@ int cmdlParse (int argc, char *argv[], cmdline_t *args)
 /******************************************************************************/
 void cmdlCleanup (cmdline_t *args)
 {
-  if (args->qmgr_name != NULL)
+  if (args->qmgr != NULL)
   {
-      free (args->qmgr_name);
-      args->qmgr_name = NULL;
+      free (args->qmgr);
+      args->qmgr = NULL;
   }
 }
