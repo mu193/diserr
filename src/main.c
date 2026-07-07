@@ -48,7 +48,8 @@ int main (int argc, char *argv[])
       return EXIT_FAILURE;
   }
 
-  /* TODO: Add your IBM MQ operations here.  */
+  /* Inquire error log.  */
+  mqInquireErrorLog (&conn);
 
   /* Disconnect from queue manager.  */
   mqDisconnect (&conn);

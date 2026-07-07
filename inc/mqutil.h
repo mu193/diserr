@@ -26,4 +26,10 @@ int  mqDisconnect (mqconn_t *conn);
 /* Get error message for reason code.  */
 const char *mqReasonStr (MQLONG reason_code);
 
+/* Open a queue.  */
+int mqOpenQueue (mqconn_t *conn, const char *qname, MQLONG options, MQHOBJ *hObj);
+
+/* Inquire error log entries from queue manager.  */
+int mqInquireErrorLog (mqconn_t *conn);
+
 #endif /* MQUTIL_H */
