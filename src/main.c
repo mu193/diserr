@@ -21,41 +21,64 @@
 
 int main (int argc, char *argv[])
 {
-  cmdline_t args;
   mqconn_t conn;
   int ret;
 
-  /* Initialize command line arguments.  */
-  cmdlInit (&args);
+  // -------------------------------------------------------
+  // Initialize command line arguments.  
+  // -------------------------------------------------------
+  cmdlInit ();
 
-  /* Parse command line arguments.  */
-  ret = cmdlParse (argc, argv, &args);
-  if (ret != 0)
+  // -------------------------------------------------------
+  // Parse command line arguments.  
+  // -------------------------------------------------------
+  ret = cmdlParse (argc, argv);
+  switch (ret)
   {
-      cmdlCleanup (&args);
-      return (ret < 0) ? EXIT_FAILURE : EXIT_SUCCESS;
-  }
-
-  /* Initialize MQ connection.  */
-  mqInit (&conn, args.qmgr);
-
-  /* Connect to queue manager.  */
-  if (mqConnect (&conn) != 0)
-  {
-      fprintf (stderr, "Failed to connect to queue manager: %s\n",
-               args.qmgr);
-      cmdlCleanup (&args);
+  case 0:      // Success - continue.  
+      break;   //
+  case 1:      // Help requested - exit cleanly.  
+      cmdlCleanup ();
+      return EXIT_SUCCESS;
+  case -1:     // Parse error - exit with failure.  
+      cmdlCleanup ();
       return EXIT_FAILURE;
   }
 
-  /* Inquire error log.  */
+  // -------------------------------------------------------
+  // Initialize MQ connection.  
+  // -------------------------------------------------------
+  mqInit (&conn);
+
+  // -------------------------------------------------------
+  // Connect to queue manager.  
+  // -------------------------------------------------------
+  if (mqConnect (&conn))
+  {
+      fprintf (stderr, "Failed to connect to queue manager: %s\n",
+               args.qmgr);
+      cmdlCleanup ();
+      return EXIT_FAILURE;
+  }
+
+  // -------------------------------------------------------
+  // Inquire error log.  
+  // -------------------------------------------------------
   mqInquireErrorLog (&conn);
 
-  /* Disconnect from queue manager.  */
-  mqDisconnect (&conn);
+  // -------------------------------------------------------
+  // Disconnect from queue manager.  
+  // -------------------------------------------------------
+  if (mqDisconnect (&conn))
+  {
+      cmdlCleanup ();
+      return EXIT_FAILURE;
+  }
 
-  /* Cleanup.  */
-  cmdlCleanup (&args);
+  // -------------------------------------------------------
+  // Cleanup.  
+  // -------------------------------------------------------
+  cmdlCleanup ();
 
   return EXIT_SUCCESS;
 }

@@ -15,7 +15,7 @@ typedef struct
 } mqconn_t;
 
 /* Initialize MQ connection structure.  */
-void mqInit       (mqconn_t *conn, const char *qmgr);
+void mqInit       (mqconn_t *conn);
 
 /* Connect to queue manager.  */
 int  mqConnect    (mqconn_t *conn);

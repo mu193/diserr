@@ -19,12 +19,16 @@
 #include <getopt.h>
 #include "cmdline.h"
 
+cmdline_t args;
+
 /******************************************************************************/
 /* Initialize command line arguments structure with default values.           */
 /******************************************************************************/
-void cmdlInit (cmdline_t *args)
+void cmdlInit (void)
 {
-  args->qmgr = NULL;
+  args.qmgr       = NULL;
+  args.logfile    = NULL;
+  args.timestamp  = NULL;
 }
 
 /******************************************************************************/
@@ -34,32 +38,54 @@ void cmdlUsage (const char *progname)
 {
   printf ("Usage: %s [OPTIONS]\n", progname);
   printf ("\nOptions:\n");
-  printf ("  -m, --qmgr <name>    Queue manager name\n");
-  printf ("  -h, --help           Display this help message\n");
+  printf ("  -m, --qmgr      <name>   Queue manager name\n");
+  printf ("  -l, --logfile   <name>   Error log file name (e.g. AMQERR01)\n");
+  printf ("  -t, --timestamp <iso>    Show entries after ISO timestamp\n");
+  printf ("  -h, --help               Display this help message\n");
 }
 
 /******************************************************************************/
 /* Parse command line arguments.                                              */
 /******************************************************************************/
-int cmdlParse (int argc, char *argv[], cmdline_t *args)
+int cmdlParse (int argc, char *argv[])
 {
   int opt;
   int option_index = 0;
 
   static struct option long_options[] = {
-    {"qmgr", required_argument, 0, 'm'},
-    {"help", no_argument,       0, 'h'},
+    {"qmgr",      required_argument, 0, 'm'},
+    {"logfile",   required_argument, 0, 'l'},
+    {"timestamp", required_argument, 0, 't'},
+    {"help",      no_argument,       0, 'h'},
     {0, 0, 0, 0}
   };
 
-  while ((opt = getopt_long (argc, argv, "m:h",
+  while ((opt = getopt_long (argc, argv, "m:l:t:h",
                              long_options, &option_index)) != -1)
   {
       switch (opt)
       {
       case 'm':
-          args->qmgr = strdup (optarg);
-          if (args->qmgr == NULL)
+          args.qmgr = strdup (optarg);
+          if (args.qmgr == NULL)
+          {
+              fprintf (stderr, "Error: Memory allocation failed\n");
+              return -1;
+          }
+          break;
+
+      case 'l':
+          args.logfile = strdup (optarg);
+          if (args.logfile == NULL)
+          {
+              fprintf (stderr, "Error: Memory allocation failed\n");
+              return -1;
+          }
+          break;
+
+      case 't':
+          args.timestamp = strdup (optarg);
+          if (args.timestamp == NULL)
           {
               fprintf (stderr, "Error: Memory allocation failed\n");
               return -1;
@@ -80,25 +106,29 @@ int cmdlParse (int argc, char *argv[], cmdline_t *args)
       }
   }
 
-  /* Check for required arguments.  */
-  if (args->qmgr == NULL)
-  {
-      fprintf (stderr, "Error: Queue manager name (-m/--qmgr) is required\n");
-      cmdlUsage (argv[0]);
-      return -1;
-  }
-
   return 0;
 }
 
 /******************************************************************************/
 /* Free allocated memory in command line arguments structure.                 */
 /******************************************************************************/
-void cmdlCleanup (cmdline_t *args)
+void cmdlCleanup (void)
 {
-  if (args->qmgr != NULL)
+  if (args.qmgr != NULL)
   {
-      free (args->qmgr);
-      args->qmgr = NULL;
+      free (args.qmgr);
+      args.qmgr = NULL;
+  }
+
+  if (args.logfile != NULL)
+  {
+      free (args.logfile);
+      args.logfile = NULL;
+  }
+
+  if (args.timestamp != NULL)
+  {
+      free (args.timestamp);
+      args.timestamp = NULL;
   }
 }

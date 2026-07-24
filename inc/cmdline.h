@@ -20,11 +20,15 @@
 typedef struct
 {
   char *qmgr;
+  char *logfile;
+  char *timestamp;
 } cmdline_t;
 
-void cmdlInit    (cmdline_t *args);
+extern cmdline_t args;
+
+void cmdlInit    (void);
 void cmdlUsage   (const char *progname);
-int  cmdlParse   (int argc, char *argv[], cmdline_t *args);
-void cmdlCleanup (cmdline_t *args);
+int  cmdlParse   (int argc, char *argv[]);
+void cmdlCleanup (void);
 
 #endif /* CMDLINE_H */

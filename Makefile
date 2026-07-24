@@ -13,8 +13,9 @@
 # Compiler and flags
 # ----------------------------------------------------------
 CC = gcc
-CFLAGS = -Wall -Wextra -std=c11 -I$(INC_DIR) -I/opt/mqm/inc
-LDFLAGS = -L/opt/mqm/lib64 -lmqm -Wl,-rpath,/opt/mqm/lib64 
+DEBUG = -g
+CFLAGS = -Wall -Wextra -std=c11 -I$(INC_DIR) -I/opt/mqm/inc $(DEBUG)
+LDFLAGS = -L/opt/mqm/lib64 -lmqm -lmqmzf -Wl,-rpath,/opt/mqm/lib64 
 
 # Directories
 SRC_DIR = src/
