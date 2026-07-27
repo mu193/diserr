@@ -20,8 +20,9 @@
 typedef struct
 {
   char *qmgr;
-  char *logfile;
-  char *timestamp;
+  char *logFile;
+  char *timeStamp;
+  char *remQmgr;
 } cmdline_t;
 
 extern cmdline_t args;

@@ -11,7 +11,7 @@ typedef struct
   MQHCONN hConn;                       // Connection handle.  
   char qmgr[MQ_Q_MGR_NAME_LENGTH + 1]; // Queue manager name.  
   MQLONG cc;                           // Completion code. 
-  MQLONG rc;                          // Reason code. 
+  MQLONG rc;                           // Reason code. 
 } mqconn_t;
 
 /* Initialize MQ connection structure.  */
@@ -26,8 +26,12 @@ int  mqDisconnect (mqconn_t *conn);
 /* Get error message for reason code.  */
 const char *mqReasonStr (MQLONG reason_code);
 
-/* Open a queue.  */
-int mqOpenQueue (mqconn_t *conn, const char *qname, MQLONG options, MQHOBJ *hObj);
+/* Open a queue. Pass NULL or "" for qmgr to target the local queue manager. */
+int mqOpenQueue  (mqconn_t *conn, const char *qname, const char *qmgr,
+                  MQLONG options, MQHOBJ *hObj);
+
+/* Close a queue opened with mqOpenQueue.  */
+int mqCloseQueue (mqconn_t *conn, MQHOBJ *hObj);
 
 /* Inquire error log entries from queue manager.  */
 int mqInquireErrorLog (mqconn_t *conn);

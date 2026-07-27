@@ -28,7 +28,8 @@
 #include "cmdline.h"
 #include "mqutil.h"
 
-#define MQ_1MB_BUF_LEN  (1024 * 1024)  /* 1 MB read buffer for PCF string values */
+#define MQ_1MB_BUF_LEN      (1024 * 1024)  /* 1 MB read buffer for PCF string values */
+#define MQ_ADMIN_COMMAND_QUEUE  "SYSTEM.ADMIN.COMMAND.QUEUE"
 
 /******************************************************************************/
 /* Initialize MQ connection structure.                                        */
@@ -207,13 +208,18 @@ const char *mqReasonStr (MQLONG reason_code)
 
 /******************************************************************************/
 /* Open a queue.                                                              */
+/* Pass NULL or "" for qmgr to target the local queue manager.               */
 /******************************************************************************/
-int mqOpenQueue (mqconn_t *conn, const char *qname, MQLONG options, MQHOBJ *hObj)
+int mqOpenQueue (mqconn_t *conn, const char *qname, const char *qmgr,
+                 MQLONG options, MQHOBJ *hObj)
 {
   MQOD   od = {MQOD_DEFAULT};
   MQLONG cc, rc;
 
   strncpy (od.ObjectName, qname, MQ_Q_NAME_LENGTH);
+
+  if (qmgr != NULL && strlen (qmgr) > 0)
+    strncpy (od.ObjectQMgrName, qmgr, MQ_Q_MGR_NAME_LENGTH);
 
   MQOPEN (conn->hConn, &od, options, hObj, &cc, &rc);
 
@@ -222,8 +228,11 @@ int mqOpenQueue (mqconn_t *conn, const char *qname, MQLONG options, MQHOBJ *hObj
     case MQRC_NONE:   // Success - continue.
       break;          //
     default:          // Error - exit with failure.
-      fprintf (stderr, "MQOPEN '%s' failed: CC=%d RC=%d %s\n",
-               qname, (int) cc, (int) rc, mqReasonStr (rc));
+      fprintf (stderr, "MQOPEN '%s'%s%s failed: CC=%d RC=%d %s\n",
+               qname,
+               (qmgr != NULL && strlen (qmgr) > 0) ? "@" : "",
+               (qmgr != NULL && strlen (qmgr) > 0) ? qmgr : "",
+               (int) cc, (int) rc, mqReasonStr (rc));
       break;
   }
 
@@ -232,7 +241,30 @@ int mqOpenQueue (mqconn_t *conn, const char *qname, MQLONG options, MQHOBJ *hObj
 
 
 /******************************************************************************/
-/* Normalize a partial ISO timestamp to the full 24-char MQ format            */
+/* Close a queue opened with mqOpenQueue.                                     */
+/******************************************************************************/
+int mqCloseQueue (mqconn_t *conn, MQHOBJ *hObj)
+{
+  MQLONG cc, rc;
+
+  MQCLOSE (conn->hConn, hObj, MQCO_NONE, &cc, &rc);
+
+  switch (rc)
+  {
+    case MQRC_NONE:
+      break;
+    default:
+      fprintf (stderr, "MQCLOSE failed: CC=%d RC=%d %s\n",
+               (int) cc, (int) rc, mqReasonStr (rc));
+      break;
+  }
+
+  return rc;
+}
+
+
+/******************************************************************************/
+/* Normalize a partial ISO timeStamp to the full 24-char MQ format            */
 /* yyyy-mm-ddThh:mm:ss.sssZ required by the command server.                   */
 /* The trailing Z is the ISO 8601 UTC designator (Zulu = UTC, i.e. +00:00).  */
 /*                                                                            */
@@ -336,11 +368,11 @@ int mqInquireErrorLog (mqconn_t *conn)
   // -------------------------------------------------------
   // Request parameters from command line args.
   // -------------------------------------------------------
-  const MQCHAR *logName      = (args.logfile   != NULL) ? args.logfile   : "";
-  const MQCHAR *afterIsoTime = (args.timestamp != NULL) ? args.timestamp : "";
+  const MQCHAR *logName      = (args.logFile   != NULL) ? args.logFile   : "";
+  const MQCHAR *afterIsoTime = (args.timeStamp != NULL) ? args.timeStamp : "";
 
   // -------------------------------------------------------
-  // Normalize the timestamp to the MQ format yyyy-mm-ddThh:mm:ss.sssZ
+  // Normalize the timeStamp to the MQ format yyyy-mm-ddThh:mm:ss.sssZ
   // (24 chars). The command server rejects (MQRCCF_CFST_STRING_LENGTH_ERR)
   // any string not matching that exact length.
   // -------------------------------------------------------
@@ -421,6 +453,23 @@ int mqInquireErrorLog (mqconn_t *conn)
   }
 
   //-------------------------------------------------------
+  // Open SYSTEM.ADMIN.COMMAND.QUEUE for PCF execution.
+  // If -r / --remQmgr was specified, the queue is opened
+  // with ObjectQMgrName set to that remote queue manager,
+  // routing the PCF command over the MQ channel infrastructure.
+  // If no remote QM was given, NULL is passed and the command
+  // targets the local queue manager.
+  //-------------------------------------------------------
+  MQHOBJ hAdminQ = MQHO_NONE;
+
+  if (mqOpenQueue (conn, MQ_ADMIN_COMMAND_QUEUE, args.remQmgr,
+                   MQOO_OUTPUT, &hAdminQ) != MQRC_NONE)
+  {
+    sysRc = 1;
+    goto _cleanup;
+  }
+
+  //-------------------------------------------------------
   // Execute PCF: MQCMD_INQUIRE_ERROR_LOG command.  
   //-------------------------------------------------------
   mqExecute (conn->hConn,
@@ -428,20 +477,35 @@ int mqInquireErrorLog (mqconn_t *conn)
              MQHB_NONE,
              cmdBag,
              repBag,
-             MQHO_NONE,
+             hAdminQ,
              MQHO_NONE,
              &cc, &rc);
+
   switch (rc)
   {
     case MQRC_NONE:
       break;
     default:            // Extract actual reason from the response bag.
     {
-      MQHBAG errorBag;
-      MQLONG cmdSrvCC, cmdSrvRC;
-      mqInquireBag    (repBag,    MQHA_BAG_HANDLE,   0,          &errorBag, &cc, &rc);
-      mqInquireInteger (errorBag, MQIASY_COMP_CODE,  MQIND_NONE, &cmdSrvCC, &cc, &rc);
-      mqInquireInteger (errorBag, MQIASY_REASON,     MQIND_NONE, &cmdSrvRC, &cc, &rc);
+      // Save the mqExecute return codes before bag operations overwrite them.
+      MQLONG execCC = cc;
+      MQLONG execRC = rc;
+
+      MQHBAG errorBag  = MQHB_UNUSABLE_HBAG;
+      MQLONG cmdSrvCC  = execCC;   // fallback: use mqExecute codes
+      MQLONG cmdSrvRC  = execRC;
+      MQLONG bagCC, bagRC;
+
+      // Try to read the command server's own cc/rc from the response bag.
+      // This only works when mqExecute got a reply back (command server
+      // error); it does NOT work for transport-level failures where the
+      // response bag was never populated.
+      mqInquireBag     (repBag,    MQHA_BAG_HANDLE,   0,          &errorBag, &bagCC, &bagRC);
+      if (bagRC == MQRC_NONE)
+      {
+        mqInquireInteger (errorBag, MQIASY_COMP_CODE,  MQIND_NONE, &cmdSrvCC, &bagCC, &bagRC);
+        mqInquireInteger (errorBag, MQIASY_REASON,     MQIND_NONE, &cmdSrvRC, &bagCC, &bagRC);
+      }
 
       switch (cmdSrvRC)
       {
@@ -563,8 +627,9 @@ int mqInquireErrorLog (mqconn_t *conn)
   }
 
   _cleanup:
-    if (cmdBag != MQHB_UNUSABLE_HBAG) mqDeleteBag (&cmdBag, &cc, &rc);
-    if (repBag != MQHB_UNUSABLE_HBAG) mqDeleteBag (&repBag, &cc, &rc);
+    if (hAdminQ != MQHO_NONE)          mqCloseQueue  (conn, &hAdminQ);
+    if (cmdBag  != MQHB_UNUSABLE_HBAG) mqDeleteBag (&cmdBag, &cc, &rc);
+    if (repBag  != MQHB_UNUSABLE_HBAG) mqDeleteBag (&repBag, &cc, &rc);
 
   return sysRc;
 }

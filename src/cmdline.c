@@ -27,8 +27,9 @@ cmdline_t args;
 void cmdlInit (void)
 {
   args.qmgr       = NULL;
-  args.logfile    = NULL;
-  args.timestamp  = NULL;
+  args.logFile    = NULL;
+  args.timeStamp  = NULL;
+  args.remQmgr     = NULL;
 }
 
 /******************************************************************************/
@@ -39,8 +40,9 @@ void cmdlUsage (const char *progname)
   printf ("Usage: %s [OPTIONS]\n", progname);
   printf ("\nOptions:\n");
   printf ("  -m, --qmgr      <name>   Queue manager name (default: default queue manager)\n");
-  printf ("  -l, --logfile   <name>   Error log file name (e.g. AMQERR01)\n");
-  printf ("  -t, --timestamp <iso>    Show entries after this ISO 8601 timestamp\n");
+  printf ("  -r, --remQmgr    <name>   Execute PCF on this remQmgr queue manager\n");
+  printf ("  -l, --logFile   <name>   Error log file name (e.g. AMQERR01)\n");
+  printf ("  -t, --timeStamp <iso>    Show entries after this ISO 8601 timeStamp\n");
   printf ("  -h, --help               Display this help message\n");
   printf ("\nTimestamp format (-t):\n");
   printf ("  Time components may be omitted from the right; missing parts default to 0.\n");
@@ -58,7 +60,7 @@ void cmdlUsage (const char *progname)
   printf ("    -HH:MM        Explicit UTC west offset (e.g. EST=-05:00)\n");
   printf ("                  e.g.  -t 2026-07-27T22:10-05:00\n");
   printf ("\n");
-  printf ("  In all cases the timestamp is normalised to yyyy-mm-ddThh:mm:ss.sssZ\n");
+  printf ("  In all cases the timeStamp is normalised to yyyy-mm-ddThh:mm:ss.sssZ\n");
   printf ("  before being sent to the queue manager command server.\n");
 }
 
@@ -72,13 +74,14 @@ int cmdlParse (int argc, char *argv[])
 
   static struct option long_options[] = {
     {"qmgr",      required_argument, 0, 'm'},
-    {"logfile",   required_argument, 0, 'l'},
-    {"timestamp", required_argument, 0, 't'},
+    {"remQmgr",    required_argument, 0, 'r'},
+    {"logFile",   required_argument, 0, 'l'},
+    {"timeStamp", required_argument, 0, 't'},
     {"help",      no_argument,       0, 'h'},
     {0, 0, 0, 0}
   };
 
-  while ((opt = getopt_long (argc, argv, "m:l:t:h",
+  while ((opt = getopt_long (argc, argv, "m:r:l:t:h",
                              long_options, &option_index)) != -1)
   {
     switch (opt)
@@ -92,9 +95,18 @@ int cmdlParse (int argc, char *argv[])
         }
         break;
 
+      case 'r':
+        args.remQmgr = strdup (optarg);
+        if (args.remQmgr == NULL)
+        {
+          fprintf (stderr, "Error: Memory allocation failed\n");
+          goto _door_error;
+        }
+        break;
+
       case 'l':
-        args.logfile = strdup (optarg);
-        if (args.logfile == NULL)
+        args.logFile = strdup (optarg);
+        if (args.logFile == NULL)
         {
           fprintf (stderr, "Error: Memory allocation failed\n");
           goto _door_error;
@@ -102,8 +114,8 @@ int cmdlParse (int argc, char *argv[])
         break;
 
       case 't':
-        args.timestamp = strdup (optarg);
-        if (args.timestamp == NULL)
+        args.timeStamp = strdup (optarg);
+        if (args.timeStamp == NULL)
         {
           fprintf (stderr, "Error: Memory allocation failed\n");
           goto _door_error;
@@ -138,15 +150,21 @@ void cmdlCleanup (void)
     args.qmgr = NULL;
   }
 
-  if (args.logfile != NULL)
+  if (args.logFile != NULL)
   {
-    free (args.logfile);
-    args.logfile = NULL;
+    free (args.logFile);
+    args.logFile = NULL;
   }
 
-  if (args.timestamp != NULL)
+  if (args.timeStamp != NULL)
   {
-    free (args.timestamp);
-    args.timestamp = NULL;
+    free (args.timeStamp);
+    args.timeStamp = NULL;
+  }
+
+  if (args.remQmgr != NULL)
+  {
+    free (args.remQmgr);
+    args.remQmgr = NULL;
   }
 }

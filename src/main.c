@@ -8,9 +8,10 @@
      diserr [OPTIONS]
 
    Options:
-     -m, --qmgr      <name>  Queue manager name
-     -l, --logfile   <name>  Error log file name (e.g. AMQERR01)
-     -t, --timestamp <iso>   Show entries after ISO timestamp
+     -m, --qmgr      <name>  Queue manager name (default: default queue manager)
+     -r, --remQmgr   <name>  Execute PCF on this remote queue manager
+     -l, --logFile   <name>  Error log file name (e.g. AMQERR01)
+     -t, --timeStamp <iso>   Show entries after ISO timestamp
      -h, --help              Display this help message
 */
 
