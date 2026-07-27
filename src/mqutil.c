@@ -54,7 +54,9 @@ int mqConnect (mqconn_t *conn)
 
   int sysRc ;
 
-  /* Prepare queue manager name.  */
+  // -------------------------------------------------------
+  // Prepare queue manager name. 
+  // -------------------------------------------------------
   memset (qmgr, ' ', MQ_Q_MGR_NAME_LENGTH);
   if (strlen (conn->qmgr) > 0)
   {
@@ -71,13 +73,13 @@ int mqConnect (mqconn_t *conn)
 
   switch (conn->rc)
   {
-  case MQRC_NONE:
+    case MQRC_NONE:
       printf ("Connected to queue manager: %s\n",
               strlen (conn->qmgr) > 0 ? conn->qmgr : "(default)");
       sysRc = 0;
       goto _door;
 
-  default:
+    default:
       fprintf (stderr, "MQCONN failed with reason code %d: %s\n",
                (int) conn->rc,
                mqReasonStr (conn->rc));
@@ -108,12 +110,12 @@ int mqDisconnect (mqconn_t *conn)
 
   switch (conn->rc)
   {
-  case MQRC_NONE:
+    case MQRC_NONE:
       printf ("Disconnected from queue manager\n");
       sysRc = 0;
       goto _door;
 
-  default:
+    default:
       fprintf (stderr, "MQDISC failed with reason code %d: %s\n",
                (int) conn->rc,
                mqReasonStr (conn->rc));
@@ -206,14 +208,17 @@ int mqOpenQueue (mqconn_t *conn, const char *qname, MQLONG options, MQHOBJ *hObj
 
   MQOPEN (conn->hConn, &od, options, hObj, &cc, &rc);
 
-  if (cc == MQCC_FAILED)
+  switch (rc)
   {
-      fprintf (stderr, "MQOPEN '%s' failed: %d %s\n",
-               qname, (int) rc, mqReasonStr (rc));
-      return -1;
+    case MQRC_NONE:   // Success - continue.
+      break;          //
+    default:          // Error - exit with failure.
+      fprintf (stderr, "MQOPEN '%s' failed: CC=%d RC=%d %s\n",
+               qname, (int) cc, (int) rc, mqReasonStr (rc));
+      break;
   }
 
-  return 0;
+  return rc;
 }
 
 
@@ -253,36 +258,36 @@ int mqInquireErrorLog (mqconn_t *conn)
   // -------------------------------------------------------
   if (strlen (logName) > 0)
   {
-      mqAddString (cmdBag, MQCACF_ERROR_LOG_NAME,
-                   MQBL_NULL_TERMINATED, (MQCHAR *) logName,
-                   &cc, &rc);
-      switch (rc)
-      {
+    mqAddString (cmdBag, MQCACF_ERROR_LOG_NAME,
+                 MQBL_NULL_TERMINATED, (MQCHAR *) logName,
+                 &cc, &rc);
+    switch (rc)
+    {
       case MQRC_NONE:
-          break;
+        break;
       default:
-          fprintf (stderr, "mqAddString (log name) failed: %d %s\n",
-                   (int) rc, mqReasonStr (rc));
-          sysRc = rc;
-          goto _cleanup;
-      }
+        fprintf( stderr, "mqAddString (log name) failed: %d %s\n",
+                         (int) rc, mqReasonStr (rc));
+        sysRc = rc;
+        goto _cleanup;
+    }
   }
 
   if (strlen (afterIsoTime) > 0)
   {
-      mqAddString (cmdBag, MQCACF_ERROR_LOG_AFTER_ISOTIME,
+    mqAddString (cmdBag, MQCACF_ERROR_LOG_AFTER_ISOTIME,
                    MQBL_NULL_TERMINATED, (MQCHAR *) afterIsoTime,
                    &cc, &rc);
-      switch (rc)
-      {
+    switch (rc)
+    {
       case MQRC_NONE:
-          break;
+        break;
       default:
-          fprintf (stderr, "mqAddString (after isotime) failed: %d %s\n",
-                   (int) rc, mqReasonStr (rc));
+        fprintf ( stderr, "mqAddString (after isotime) failed: %d %s\n",
+                  (int) rc, mqReasonStr (rc));
           sysRc = rc;
           goto _cleanup;
-      }
+    }
   }
 
   // -------------------------------------------------------
@@ -315,9 +320,8 @@ int mqInquireErrorLog (mqconn_t *conn)
   {
     case MQRC_NONE:
       break;
-    default:
-    {
-      /* Extract actual error reason from the response bag system bag.  */
+    default:            // Extract actual error reason 
+    {                   // from the response bag system bag.  
       MQHBAG errorBag;
       MQLONG cmdSrvCC, cmdSrvRC;
       mqInquireBag (repBag, MQHA_BAG_HANDLE, 0, &errorBag, &cc, &rc);
@@ -371,6 +375,9 @@ int mqInquireErrorLog (mqconn_t *conn)
 
       switch (itemType)
       {
+        // -------------------------------------------------
+        // Handle STRING item types.
+        // -------------------------------------------------
         case MQIT_STRING:
         {
           MQCHAR value[1048576];
@@ -380,24 +387,28 @@ int mqInquireErrorLog (mqconn_t *conn)
                            NULL, &cc, &rc);
           switch (rc)
           {
-          case MQRC_NONE:
+            case MQRC_NONE:
               printf ("  [%d] %.*s\n", (int) selector,
                       (int) strLen, value);
               break;
-          case MQRC_STRING_TRUNCATED:
+            case MQRC_STRING_TRUNCATED:
               fprintf (stderr, "  Warning: selector %d string truncated"
                                " (%d bytes returned)\n",
                        (int) selector, (int) sizeof (value));
               printf ("  [%d] %.*s\n", (int) selector,
                       (int) sizeof (value), value);
               break;
-          default:
+            default:
               fprintf (stderr, "  mqInquireString selector %d failed: %d %s\n",
                        (int) selector, (int) rc, mqReasonStr (rc));
               break;
           }
           break;
         }
+
+        // -------------------------------------------------
+        // Handle INTEGER item types.
+        // -------------------------------------------------
         case MQIT_INTEGER:
         {
           MQLONG value;
@@ -415,6 +426,10 @@ int mqInquireErrorLog (mqconn_t *conn)
           }
           break;
         }
+
+        // -------------------------------------------------
+        // Any other item types are unexpected for this command.
+        // -------------------------------------------------
         default:
           fprintf (stderr, "Warning: unexpected item type %d for selector %d\n",
                    (int) itemType, (int) selector);
@@ -423,11 +438,9 @@ int mqInquireErrorLog (mqconn_t *conn)
     }
   }
 
-_cleanup:
-  if (cmdBag != MQHB_UNUSABLE_HBAG)
-      mqDeleteBag (&cmdBag, &cc, &rc);
-  if (repBag != MQHB_UNUSABLE_HBAG)
-      mqDeleteBag (&repBag, &cc, &rc);
+  _cleanup:
+    if (cmdBag != MQHB_UNUSABLE_HBAG) mqDeleteBag (&cmdBag, &cc, &rc);
+    if (repBag != MQHB_UNUSABLE_HBAG) mqDeleteBag (&repBag, &cc, &rc);
 
   return sysRc;
 }

@@ -5,13 +5,13 @@
    operations to report on errors and system status.
 
    Usage:
-     diserr -m <qmgr>
-     diserr --qmgr <qmgr>
-     diserr --help
+     diserr [OPTIONS]
 
    Options:
-     -m, --qmgr <name>  Queue manager name to connect to
-     -h, --help         Display usage information
+     -m, --qmgr      <name>  Queue manager name
+     -l, --logfile   <name>  Error log file name (e.g. AMQERR01)
+     -t, --timestamp <iso>   Show entries after ISO timestamp
+     -h, --help              Display this help message
 */
 
 #include <stdio.h>
@@ -22,7 +22,7 @@
 int main (int argc, char *argv[])
 {
   mqconn_t conn;
-  int ret;
+  int rc;
 
   // -------------------------------------------------------
   // Initialize command line arguments.  
@@ -32,17 +32,15 @@ int main (int argc, char *argv[])
   // -------------------------------------------------------
   // Parse command line arguments.  
   // -------------------------------------------------------
-  ret = cmdlParse (argc, argv);
-  switch (ret)
+  rc = cmdlParse (argc, argv);
+  switch (rc)
   {
-  case 0:      // Success - continue.  
-      break;   //
-  case 1:      // Help requested - exit cleanly.  
-      cmdlCleanup ();
-      return EXIT_SUCCESS;
-  case -1:     // Parse error - exit with failure.  
-      cmdlCleanup ();
-      return EXIT_FAILURE;
+    case 0:          // Success - continue.  
+      break;         //
+    case 1:          // Help requested - exit cleanly.  
+      goto _door_ok; //
+    case -1:         // Parse error - exit with failure.  
+      goto _door_error;
   }
 
   // -------------------------------------------------------
@@ -55,30 +53,39 @@ int main (int argc, char *argv[])
   // -------------------------------------------------------
   if (mqConnect (&conn))
   {
-      fprintf (stderr, "Failed to connect to queue manager: %s\n",
-               args.qmgr);
-      cmdlCleanup ();
-      return EXIT_FAILURE;
+    fprintf ( stderr, "Failed to connect to queue manager: %s\n",
+              args.qmgr);
+    goto _door_error;
   }
 
   // -------------------------------------------------------
   // Inquire error log.  
   // -------------------------------------------------------
-  mqInquireErrorLog (&conn);
+  rc = mqInquireErrorLog (&conn);
+  switch (rc)
+  {
+    case 0:           // Success - continue.  
+      break;          //
+    default:          // Error - exit with failure.  
+      goto _door_error;
+  }
 
   // -------------------------------------------------------
   // Disconnect from queue manager.  
   // -------------------------------------------------------
   if (mqDisconnect (&conn))
   {
-      cmdlCleanup ();
-      return EXIT_FAILURE;
+    fprintf (stderr, "Failed to disconnect from queue manager: %s\n",
+             args.qmgr);
+    goto _door_error;
   }
 
-  // -------------------------------------------------------
-  // Cleanup.  
-  // -------------------------------------------------------
-  cmdlCleanup ();
+  _door_ok:
+    cmdlCleanup ();
+    return EXIT_SUCCESS;
 
-  return EXIT_SUCCESS;
+  _door_error:
+    cmdlCleanup ();
+    return EXIT_FAILURE;
+
 }

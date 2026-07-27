@@ -64,46 +64,46 @@ int cmdlParse (int argc, char *argv[])
                              long_options, &option_index)) != -1)
   {
       switch (opt)
-      {
-      case 'm':
-          args.qmgr = strdup (optarg);
-          if (args.qmgr == NULL)
-          {
-              fprintf (stderr, "Error: Memory allocation failed\n");
-              return -1;
-          }
-          break;
+        {
+        case 'm':
+            args.qmgr = strdup (optarg);
+            if (args.qmgr == NULL)
+            {
+                fprintf (stderr, "Error: Memory allocation failed\n");
+                return -1;
+            }
+            break;
 
-      case 'l':
-          args.logfile = strdup (optarg);
-          if (args.logfile == NULL)
-          {
-              fprintf (stderr, "Error: Memory allocation failed\n");
-              return -1;
-          }
-          break;
+        case 'l':
+            args.logfile = strdup (optarg);
+            if (args.logfile == NULL)
+            {
+                fprintf (stderr, "Error: Memory allocation failed\n");
+                return -1;
+            }
+            break;
 
-      case 't':
-          args.timestamp = strdup (optarg);
-          if (args.timestamp == NULL)
-          {
-              fprintf (stderr, "Error: Memory allocation failed\n");
-              return -1;
-          }
-          break;
+        case 't':
+            args.timestamp = strdup (optarg);
+            if (args.timestamp == NULL)
+            {
+                fprintf (stderr, "Error: Memory allocation failed\n");
+                return -1;
+            }
+            break;
 
-      case 'h':
-          cmdlUsage (argv[0]);
-          return 1;
+        case 'h':
+            cmdlUsage (argv[0]);
+            return 1;
 
-      case '?':
-          /* getopt_long already printed an error message.  */
-          cmdlUsage (argv[0]);
-          return -1;
+        case '?':
+            /* getopt_long already printed an error message.  */
+            cmdlUsage (argv[0]);
+            return -1;
 
-      default:
-          return -1;
-      }
+        default:
+            return -1;
+        }
   }
 
   return 0;
@@ -116,19 +116,19 @@ void cmdlCleanup (void)
 {
   if (args.qmgr != NULL)
   {
-      free (args.qmgr);
-      args.qmgr = NULL;
+    free (args.qmgr);
+    args.qmgr = NULL;
   }
 
   if (args.logfile != NULL)
   {
-      free (args.logfile);
-      args.logfile = NULL;
+    free (args.logfile);
+    args.logfile = NULL;
   }
 
   if (args.timestamp != NULL)
   {
-      free (args.timestamp);
-      args.timestamp = NULL;
+    free (args.timestamp);
+    args.timestamp = NULL;
   }
 }
