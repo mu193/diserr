@@ -8,7 +8,7 @@
 
    Functions:
      mqInit            - Initialize MQ connection structure
-     mqConnect         - Connect to IBM MQ queue manager using MQCONN
+     mqConnect         - Connect to IBM MQ queue manager using MQCONNX with auto-reconnect
      mqDisconnect      - Disconnect from queue manager using MQDISC
      mqReasonStr       - Convert MQ reason codes to readable strings
      mqOpenQueue       - Open a queue using MQOPEN
@@ -40,6 +40,7 @@ void mqInit (mqconn_t *conn)
   conn->cc = MQCC_OK;
   conn->rc = MQRC_NONE;
 
+  /* QM name from -m or -c (single field) */
   if (args.qmgr != NULL)
   {
       strncpy (conn->qmgr, args.qmgr, MQ_Q_MGR_NAME_LENGTH);
@@ -57,25 +58,34 @@ void mqInit (mqconn_t *conn)
 int mqConnect (mqconn_t *conn)
 {
   MQCHAR qmgr[MQ_Q_MGR_NAME_LENGTH + 1];
-
-  int sysRc ;
+  MQCNO  cno = {MQCNO_DEFAULT};  // Connection options struct; MQCNO_DEFAULT sets all
+                                 // fields to MQ-defined defaults (version, options=NONE,
+                                 // no security exit, no client channel definition, etc.)
+  int    sysRc;
 
   // -------------------------------------------------------
   // Prepare queue manager name. 
   // -------------------------------------------------------
   memset (qmgr, ' ', MQ_Q_MGR_NAME_LENGTH);
+  qmgr[MQ_Q_MGR_NAME_LENGTH] = '\0';
   if (strlen (conn->qmgr) > 0)
-  {
       memcpy (qmgr, conn->qmgr, strlen (conn->qmgr));
-  }
 
   // -------------------------------------------------------
-  // Connect to queue manager.  
+  // Set binding mode: client if -c was given, else fast-path
+  // binding (local shared memory). Auto-reconnect is enabled
+  // for client mode only (MQCNO_RECONNECT_Q_MGR).
   // -------------------------------------------------------
-  MQCONN (qmgr,
-          &conn->hConn,
-          &conn->cc,
-          &conn->rc);
+  if (args.connType == CONN_CLIENT)
+    cno.Options = MQCNO_CLIENT_BINDING | MQCNO_RECONNECT_Q_MGR;
+  else
+    cno.Options = MQCNO_FASTPATH_BINDING;
+
+  MQCONNX (qmgr,
+           &cno,
+           &conn->hConn,
+           &conn->cc,
+           &conn->rc);
 
   switch (conn->rc)
   {
@@ -86,7 +96,7 @@ int mqConnect (mqconn_t *conn)
       goto _door;
 
     default:
-      fprintf (stderr, "MQCONN failed with reason code %d: %s\n",
+      fprintf (stderr, "MQCONNX failed with reason code %d: %s\n",
                (int) conn->rc,
                mqReasonStr (conn->rc));
       sysRc = conn->rc;

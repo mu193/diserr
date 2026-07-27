@@ -26,10 +26,11 @@ cmdline_t args;
 /******************************************************************************/
 void cmdlInit (void)
 {
-  args.qmgr       = NULL;
-  args.logFile    = NULL;
-  args.timeStamp  = NULL;
-  args.remQmgr     = NULL;
+  args.qmgr      = NULL;
+  args.connType  = CONN_BINDING;
+  args.logFile   = NULL;
+  args.timeStamp = NULL;
+  args.remQmgr   = NULL;
 }
 
 /******************************************************************************/
@@ -39,11 +40,13 @@ void cmdlUsage (const char *progname)
 {
   printf ("Usage: %s [OPTIONS]\n", progname);
   printf ("\nOptions:\n");
-  printf ("  -m, --qmgr      <name>   Queue manager name (default: default queue manager)\n");
-  printf ("  -r, --remQmgr    <name>   Execute PCF on this remQmgr queue manager\n");
-  printf ("  -l, --logFile   <name>   Error log file name (e.g. AMQERR01)\n");
-  printf ("  -t, --timeStamp <iso>    Show entries after this ISO 8601 timeStamp\n");
-  printf ("  -h, --help               Display this help message\n");
+  printf ("  -m, --qmgr        <name>   Connect in binding mode to this queue manager\n");
+  printf ("  -c, --qmgr        <name>   Connect in client mode to this queue manager\n");
+  printf ("  -r, --remQmgr     <name>   Execute PCF on this remote queue manager\n");
+  printf ("  -l, --logFile     <name>   Error log file name (e.g. AMQERR01)\n");
+  printf ("  -t, --timeStamp   <iso>    Show entries after this ISO 8601 timeStamp\n");
+  printf ("  -h, --help                 Display this help message\n");
+  printf ("\nNote: -m and -c are mutually exclusive.\n");
   printf ("\nTimestamp format (-t):\n");
   printf ("  Time components may be omitted from the right; missing parts default to 0.\n");
   printf ("  The timezone suffix controls how the time is interpreted:\n");
@@ -73,26 +76,32 @@ int cmdlParse (int argc, char *argv[])
   int option_index = 0;
 
   static struct option long_options[] = {
-    {"qmgr",      required_argument, 0, 'm'},
-    {"remQmgr",    required_argument, 0, 'r'},
-    {"logFile",   required_argument, 0, 'l'},
-    {"timeStamp", required_argument, 0, 't'},
-    {"help",      no_argument,       0, 'h'},
+    {"qmgr",       required_argument, 0, 'm'},
+    {"qmgr",       required_argument, 0, 'c'},
+    {"remQmgr",     required_argument, 0, 'r'},
+    {"logFile",     required_argument, 0, 'l'},
+    {"timeStamp",   required_argument, 0, 't'},
+    {"help",        no_argument,       0, 'h'},
     {0, 0, 0, 0}
   };
 
-  while ((opt = getopt_long (argc, argv, "m:r:l:t:h",
+  while ((opt = getopt_long (argc, argv, "m:c:r:l:t:h",
                              long_options, &option_index)) != -1)
   {
     switch (opt)
     {
       case 'm':
-        args.qmgr = strdup (optarg);
-        if (args.qmgr == NULL)
-        {
-          fprintf (stderr, "Error: Memory allocation failed\n");
-          goto _door_error;
-        }
+        if (args.qmgr != NULL) { fprintf (stderr, "Error: -m and -c are mutually exclusive\n"); goto _door_error; }
+        args.qmgr     = strdup (optarg);
+        args.connType = CONN_BINDING;
+        if (args.qmgr == NULL) { fprintf (stderr, "Error: Memory allocation failed\n"); goto _door_error; }
+        break;
+
+      case 'c':
+        if (args.qmgr != NULL) { fprintf (stderr, "Error: -m and -c are mutually exclusive\n"); goto _door_error; }
+        args.qmgr     = strdup (optarg);
+        args.connType = CONN_CLIENT;
+        if (args.qmgr == NULL) { fprintf (stderr, "Error: Memory allocation failed\n"); goto _door_error; }
         break;
 
       case 'r':
