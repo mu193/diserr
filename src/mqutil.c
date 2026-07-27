@@ -1,3 +1,5 @@
+#define _GNU_SOURCE         /* timegm(3) */
+
 /* mqutil.c - IBM MQ connection and utility functions.
 
    This module provides wrapper functions for IBM MQ operations,
@@ -19,11 +21,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <cmqc.h>
 #include <cmqcfc.h>
 #include <cmqbc.h>
 #include "cmdline.h"
 #include "mqutil.h"
+
+#define MQ_1MB_BUF_LEN  (1024 * 1024)  /* 1 MB read buffer for PCF string values */
 
 /******************************************************************************/
 /* Initialize MQ connection structure.                                        */
@@ -190,6 +195,10 @@ const char *mqReasonStr (MQLONG reason_code)
       return "Command server not available";
     case MQRC_MSG_TOO_BIG_FOR_Q:
       return "Message too big for queue";
+    case MQRCCF_CFST_STRING_LENGTH_ERR:
+      return "PCF string parameter length error";
+    case MQRCCF_NONE_FOUND:
+      return "No matching entries found";
     default:
       return "Unknown reason code";
     }
@@ -223,6 +232,103 @@ int mqOpenQueue (mqconn_t *conn, const char *qname, MQLONG options, MQHOBJ *hObj
 
 
 /******************************************************************************/
+/* Normalize a partial ISO timestamp to the full 24-char MQ format            */
+/* yyyy-mm-ddThh:mm:ss.sssZ required by the command server.                   */
+/* The trailing Z is the ISO 8601 UTC designator (Zulu = UTC, i.e. +00:00).  */
+/*                                                                            */
+/* Timezone handling:                                                         */
+/*   No timezone suffix    -> treated as local system time, converted to UTC  */
+/*   Z suffix              -> already UTC, used as-is                         */
+/*   +HH:MM / -HH:MM suffix -> explicit offset, converted to UTC              */
+/*                                                                            */
+/* Missing time components default to zero.                                   */
+/******************************************************************************/
+static const MQCHAR *mqNormalizeIsoTime (const MQCHAR *ts,
+                                         MQCHAR *buf, size_t bufLen)
+{
+  int    year = 0, mon = 1, day = 1;
+  int    hour = 0, min = 0, sec = 0, ms = 0;
+  size_t len = strlen (ts);
+
+  // -------------------------------------------------------
+  // Already fully-formed UTC - return as-is 
+  // -------------------------------------------------------
+  if (len == 24 && ts[23] == 'Z')
+    return ts;
+
+  // -------------------------------------------------------
+  // Parse as many date/time components as the string contains 
+  // -------------------------------------------------------
+  sscanf (ts, "%4d-%2d-%2dT%2d:%2d:%2d",
+          &year, &mon, &day, &hour, &min, &sec);
+
+  // -------------------------------------------------------
+  // Locate timezone indicator (Z / + / -) after the date-T prefix 
+  // -------------------------------------------------------
+  const char *tz = NULL;
+  for (size_t i = 11; i < len; i++)
+  {
+    if (ts[i] == 'Z' || ts[i] == '+' || ts[i] == '-')
+    {
+      tz = ts + i;
+      break;
+    }
+  }
+
+  // -------------------------------------------------------
+  // Parse fractional milliseconds between '.' and the tz indicator 
+  // -------------------------------------------------------
+  if (len >= 20 && ts[19] == '.')
+  {
+    const char *msEnd   = (tz != NULL) ? tz : ts + len;
+    const char *msStart = ts + 20;
+    int ndigits = (int)(msEnd - msStart);
+    char msbuf[4] = "000";
+    if (ndigits < 0) ndigits = 0;
+    if (ndigits > 3) ndigits = 3;
+    for (int i = 0; i < ndigits; i++) msbuf[i] = msStart[i];
+    ms = atoi (msbuf);
+  }
+
+  // -------------------------------------------------------
+  // Build tm struct from parsed components 
+  // -------------------------------------------------------
+  struct tm tm = {0};
+  tm.tm_year = year - 1900;
+  tm.tm_mon  = mon  - 1;
+  tm.tm_mday = day;
+  tm.tm_hour = hour;
+  tm.tm_min  = min;
+  tm.tm_sec  = sec;
+
+  time_t t;
+  if (tz == NULL)         // -------------------------------
+  {                       // 
+    tm.tm_isdst = -1;     // No timezone: interpret as local time; 
+    t = mktime (&tm);     // mktime converts to UTC epoch 
+  }                       //
+  else if (*tz == 'Z')    // ---------------
+  {                       //
+    t = timegm (&tm);     // Explicit UTC 
+  }                       //
+  else                    // ---------------
+  {                                       //
+    int tzh = 0, tzm = 0;                 // Explicit offset +HH:MM or -HH:MM 
+    sscanf (tz+1, "%2d:%2d", &tzh, &tzm); //
+    int offsetSec = tzh*3600 + tzm*60;    // East of UTC (+) means local is ahead: 
+    t = timegm (&tm);                     // subtract offset to reach UTC 
+    t += (*tz == '+') ? -offsetSec : +offsetSec;
+  }                                       // ---------------
+
+  struct tm *utc = gmtime (&t);
+  snprintf (buf, bufLen, "%04d-%02d-%02dT%02d:%02d:%02d.%03dZ",
+            utc->tm_year + 1900, utc->tm_mon + 1, utc->tm_mday,
+            utc->tm_hour, utc->tm_min, utc->tm_sec, ms);
+  return buf;
+}
+
+
+/******************************************************************************/
 /* Inquire error log entries from the queue manager via MQAI Bags.            */
 /******************************************************************************/
 int mqInquireErrorLog (mqconn_t *conn)
@@ -232,6 +338,15 @@ int mqInquireErrorLog (mqconn_t *conn)
   // -------------------------------------------------------
   const MQCHAR *logName      = (args.logfile   != NULL) ? args.logfile   : "";
   const MQCHAR *afterIsoTime = (args.timestamp != NULL) ? args.timestamp : "";
+
+  // -------------------------------------------------------
+  // Normalize the timestamp to the MQ format yyyy-mm-ddThh:mm:ss.sssZ
+  // (24 chars). The command server rejects (MQRCCF_CFST_STRING_LENGTH_ERR)
+  // any string not matching that exact length.
+  // -------------------------------------------------------
+  MQCHAR  isoTimeBuf[MQ_ISOTIME_LENGTH + 1];
+  if (strlen (afterIsoTime) > 0)
+    afterIsoTime = mqNormalizeIsoTime (afterIsoTime, isoTimeBuf, sizeof (isoTimeBuf));
 
   MQHBAG  cmdBag = MQHB_UNUSABLE_HBAG;
   MQHBAG  repBag = MQHB_UNUSABLE_HBAG;
@@ -320,18 +435,27 @@ int mqInquireErrorLog (mqconn_t *conn)
   {
     case MQRC_NONE:
       break;
-    default:            // Extract actual error reason 
-    {                   // from the response bag system bag.  
+    default:            // Extract actual reason from the response bag.
+    {
       MQHBAG errorBag;
       MQLONG cmdSrvCC, cmdSrvRC;
-      mqInquireBag (repBag, MQHA_BAG_HANDLE, 0, &errorBag, &cc, &rc);
-      mqInquireInteger (errorBag, MQIASY_COMP_CODE, MQIND_NONE,
-                        &cmdSrvCC, &cc, &rc);
-      mqInquireInteger (errorBag, MQIASY_REASON, MQIND_NONE,
-                        &cmdSrvRC, &cc, &rc);
-      fprintf (stderr, "mqExecute failed: command server cc=%d rc=%d %s\n",
-               (int) cmdSrvCC, (int) cmdSrvRC, mqReasonStr (cmdSrvRC));
-      sysRc = cmdSrvRC;
+      mqInquireBag    (repBag,    MQHA_BAG_HANDLE,   0,          &errorBag, &cc, &rc);
+      mqInquireInteger (errorBag, MQIASY_COMP_CODE,  MQIND_NONE, &cmdSrvCC, &cc, &rc);
+      mqInquireInteger (errorBag, MQIASY_REASON,     MQIND_NONE, &cmdSrvRC, &cc, &rc);
+
+      switch (cmdSrvRC)
+      {
+        case MQRCCF_NONE_FOUND:           // No entries match the criteria - not an error.
+          printf ("No error log entries found for the given criteria.\n");
+          sysRc = 0;
+          break;
+
+        default:                          // Genuine command server error.
+          fprintf (stderr, "mqExecute failed: command server cc=%d rc=%d %s\n",
+                   (int) cmdSrvCC, (int) cmdSrvRC, mqReasonStr (cmdSrvRC));
+          sysRc = cmdSrvRC;
+          break;
+      }
       goto _cleanup;
     }
   }
@@ -380,7 +504,7 @@ int mqInquireErrorLog (mqconn_t *conn)
         // -------------------------------------------------
         case MQIT_STRING:
         {
-          MQCHAR value[1048576];
+          MQCHAR value[MQ_1MB_BUF_LEN];
           MQLONG strLen;
           mqInquireString (itemBag, selector, 0,
                            sizeof (value), value, &strLen,

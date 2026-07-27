@@ -38,10 +38,28 @@ void cmdlUsage (const char *progname)
 {
   printf ("Usage: %s [OPTIONS]\n", progname);
   printf ("\nOptions:\n");
-  printf ("  -m, --qmgr      <name>   Queue manager name\n");
+  printf ("  -m, --qmgr      <name>   Queue manager name (default: default queue manager)\n");
   printf ("  -l, --logfile   <name>   Error log file name (e.g. AMQERR01)\n");
-  printf ("  -t, --timestamp <iso>    Show entries after ISO timestamp\n");
+  printf ("  -t, --timestamp <iso>    Show entries after this ISO 8601 timestamp\n");
   printf ("  -h, --help               Display this help message\n");
+  printf ("\nTimestamp format (-t):\n");
+  printf ("  Time components may be omitted from the right; missing parts default to 0.\n");
+  printf ("  The timezone suffix controls how the time is interpreted:\n");
+  printf ("\n");
+  printf ("    No suffix     Local system time, automatically converted to UTC\n");
+  printf ("                  e.g.  -t 2026-07-27T22:10\n");
+  printf ("\n");
+  printf ("    Z suffix      Explicit UTC (Zulu)\n");
+  printf ("                  e.g.  -t 2026-07-27T22:10:11.226Z\n");
+  printf ("\n");
+  printf ("    +HH:MM        Explicit UTC east offset (e.g. CET=+01:00, CEST=+02:00)\n");
+  printf ("                  e.g.  -t 2026-07-27T22:10+02:00\n");
+  printf ("\n");
+  printf ("    -HH:MM        Explicit UTC west offset (e.g. EST=-05:00)\n");
+  printf ("                  e.g.  -t 2026-07-27T22:10-05:00\n");
+  printf ("\n");
+  printf ("  In all cases the timestamp is normalised to yyyy-mm-ddThh:mm:ss.sssZ\n");
+  printf ("  before being sent to the queue manager command server.\n");
 }
 
 /******************************************************************************/
@@ -63,50 +81,50 @@ int cmdlParse (int argc, char *argv[])
   while ((opt = getopt_long (argc, argv, "m:l:t:h",
                              long_options, &option_index)) != -1)
   {
-      switch (opt)
+    switch (opt)
+    {
+      case 'm':
+        args.qmgr = strdup (optarg);
+        if (args.qmgr == NULL)
         {
-        case 'm':
-            args.qmgr = strdup (optarg);
-            if (args.qmgr == NULL)
-            {
-                fprintf (stderr, "Error: Memory allocation failed\n");
-                return -1;
-            }
-            break;
-
-        case 'l':
-            args.logfile = strdup (optarg);
-            if (args.logfile == NULL)
-            {
-                fprintf (stderr, "Error: Memory allocation failed\n");
-                return -1;
-            }
-            break;
-
-        case 't':
-            args.timestamp = strdup (optarg);
-            if (args.timestamp == NULL)
-            {
-                fprintf (stderr, "Error: Memory allocation failed\n");
-                return -1;
-            }
-            break;
-
-        case 'h':
-            cmdlUsage (argv[0]);
-            return 1;
-
-        case '?':
-            /* getopt_long already printed an error message.  */
-            cmdlUsage (argv[0]);
-            return -1;
-
-        default:
-            return -1;
+          fprintf (stderr, "Error: Memory allocation failed\n");
+          goto _door_error;
         }
+        break;
+
+      case 'l':
+        args.logfile = strdup (optarg);
+        if (args.logfile == NULL)
+        {
+          fprintf (stderr, "Error: Memory allocation failed\n");
+          goto _door_error;
+        }
+        break;
+
+      case 't':
+        args.timestamp = strdup (optarg);
+        if (args.timestamp == NULL)
+        {
+          fprintf (stderr, "Error: Memory allocation failed\n");
+          goto _door_error;
+        }
+        break;
+
+      case '?':
+      case 'h':
+        cmdlUsage (argv[0]);
+        goto _door_ok;
+
+      default:
+        goto _door_error;
+    }
   }
 
-  return 0;
+  _door_ok:
+    return 0;
+
+  _door_error:
+    return 1 ;
 }
 
 /******************************************************************************/
