@@ -27,7 +27,7 @@ cmdline_t args;
 void cmdlInit (void)
 {
   args.qmgr      = NULL;
-  args.connType  = CONN_BINDING;
+  args.connType  = BINDING;
   args.logFile   = NULL;
   args.timeStamp = NULL;
   args.remQmgr   = NULL;
@@ -93,14 +93,14 @@ int cmdlParse (int argc, char *argv[])
       case 'm':
         if (args.qmgr != NULL) { fprintf (stderr, "Error: -m and -c are mutually exclusive\n"); goto _door_error; }
         args.qmgr     = strdup (optarg);
-        args.connType = CONN_BINDING;
+        args.connType = BINDING;
         if (args.qmgr == NULL) { fprintf (stderr, "Error: Memory allocation failed\n"); goto _door_error; }
         break;
 
       case 'c':
         if (args.qmgr != NULL) { fprintf (stderr, "Error: -m and -c are mutually exclusive\n"); goto _door_error; }
         args.qmgr     = strdup (optarg);
-        args.connType = CONN_CLIENT;
+        args.connType = CLIENT;
         if (args.qmgr == NULL) { fprintf (stderr, "Error: Memory allocation failed\n"); goto _door_error; }
         break;
 

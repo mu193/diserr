@@ -14,7 +14,7 @@
 # ----------------------------------------------------------
 CC = gcc
 DEBUG = -g
-CFLAGS = -Wall -Wextra -std=c11 -I$(INC_DIR) -I/opt/mqm/inc $(DEBUG)
+CFLAGS = -Wall -Wextra -std=c11 -I$(INC_DIR) -I/opt/mqm/inc $(DEBUG) -MMD -MP
 LDFLAGS = -L/opt/mqm/lib64 -lmqm -lmqmzf -Wl,-rpath,/opt/mqm/lib64 
 
 # Directories
@@ -35,6 +35,7 @@ SRC_FILES = main.c cmdline.c mqutil.c
 
 SOURCES = $(addprefix $(SRC_DIR), $(SRC_FILES))
 OBJECTS = $(addprefix $(OBJ_DIR), $(SRC_FILES:.c=.o))
+DEPS    = $(OBJECTS:.o=.d)
 
 # ----------------------------------------------------------
 # Default target
@@ -61,6 +62,11 @@ $(BIN_DIR):
 
 $(OBJ_DIR):
 	mkdir -p $(OBJ_DIR)
+
+# ----------------------------------------------------------
+# Auto-generated header dependencies (produced by -MMD -MP)
+# ----------------------------------------------------------
+-include $(DEPS)
 
 # ----------------------------------------------------------
 # Clean build artifacts

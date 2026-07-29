@@ -73,13 +73,12 @@ int mqConnect (mqconn_t *conn)
 
   // -------------------------------------------------------
   // Set binding mode: client if -c was given, else fast-path
-  // binding (local shared memory). Auto-reconnect is enabled
-  // for client mode only (MQCNO_RECONNECT_Q_MGR).
+  // binding (local shared memory).
   // -------------------------------------------------------
-  if (args.connType == CONN_CLIENT)
-    cno.Options = MQCNO_CLIENT_BINDING | MQCNO_RECONNECT_Q_MGR;
+  if (args.connType == CLIENT)
+    cno.Options = MQCNO_CLIENT_BINDING;
   else
-    cno.Options = MQCNO_FASTPATH_BINDING;
+    cno.Options = MQCNO_STANDARD_BINDING;
 
   MQCONNX (qmgr,
            &cno,

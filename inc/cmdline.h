@@ -16,19 +16,19 @@
 #ifndef CMDLINE_H
 #define CMDLINE_H
 
-/* Connection mode selected by -m (binding) or -c (client).  */
+// Connection mode selected by -m (binding) or -c (client). 
 typedef enum
 {
-  CONN_BINDING = 1,   /* local binding via shared memory (default) */
-  CONN_CLIENT  = 2    /* TCP client via MQ channel infrastructure   */
+  BINDING = 1,   // local binding via shared memory (default) 
+  CLIENT  = 2    // TCP client via MQ channel infrastructure  
 } connType_t;
 
 /* Parsed command line arguments.  */
 typedef struct
 {
-  char       *qmgr;       /* queue manager name (-m or -c)              */
-  connType_t  connType;   /* connection mode: CONN_BINDING / CONN_CLIENT */
-  char       *logFile;
+  char       *qmgr;       // queue manager name (-m or -c)            
+  connType_t  connType;   // connection mode: BINDING / CLIENT 
+  char       *logFile;    // error log file name (-l)         
   char       *timeStamp;
   char       *remQmgr;
 } cmdline_t;
