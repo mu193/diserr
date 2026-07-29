@@ -16,25 +16,36 @@
 #ifndef CMDLINE_H
 #define CMDLINE_H
 
+/******************************************************************************/
+/*                               T Y P E S                                    */
+/******************************************************************************/
+
+// ---------------------------------------------------------
 // Connection mode selected by -m (binding) or -c (client). 
+// ---------------------------------------------------------
 typedef enum
 {
   BINDING = 1,   // local binding via shared memory (default) 
   CLIENT  = 2    // TCP client via MQ channel infrastructure  
 } connType_t;
 
-/* Parsed command line arguments.  */
+// ---------------------------------------------------------
+// Parsed command line arguments. 
+// ---------------------------------------------------------
 typedef struct
 {
-  char       *qmgr;       // queue manager name (-m or -c)            
-  connType_t  connType;   // connection mode: BINDING / CLIENT 
-  char       *logFile;    // error log file name (-l)         
-  char       *timeStamp;
-  char       *remQmgr;
+  char       *qmgr;       // queue manager name: binding (-m) or client (-c)
+  connType_t  connType;   // connection mode: BINDING (-m) / CLIENT (-c)
+  char       *logFile;    // error log file name (-l)
+  char       *timeStamp;  // ISO 8601 timestamp (-t) for filtering log entries
+  char       *remQmgr;    // remote queue manager name (-r) for PCF execution
 } cmdline_t;
 
 extern cmdline_t args;
 
+/******************************************************************************/
+/*                            P R O T O T Y P E S                             */
+/******************************************************************************/
 void cmdlInit    (void);
 void cmdlUsage   (const char *progname);
 int  cmdlParse   (int argc, char *argv[]);

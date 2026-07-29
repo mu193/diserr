@@ -11,15 +11,29 @@
      cmdlCleanup  - Free allocated memory in arguments structure
 */
 
-#define _POSIX_C_SOURCE 200809L // use POSIX.1-2008 
+#define _POSIX_C_SOURCE 200809L // use POSIX.1-2008; 
+                                //  enable getopt_long and strdup
 
+/******************************************************************************/
+/*                               I N C L U D E S                              */
+/******************************************************************************/
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <getopt.h>
 #include "cmdline.h"
 
+/******************************************************************************/
+/*                          G L O B A L   V A R S                             */
+/******************************************************************************/
 cmdline_t args;
+
+/******************************************************************************/
+/*                                                                            */
+/*                             F U N C T I O N S                              */
+/*                                                                            */
+/******************************************************************************/
 
 /******************************************************************************/
 /* Initialize command line arguments structure with default values.           */
@@ -90,20 +104,48 @@ int cmdlParse (int argc, char *argv[])
   {
     switch (opt)
     {
+      // -------------------------------------------------------
+      // Connection mode: binding (-m) 
+      //   sets args.qmgr and args.connType to BINDING
+      // -------------------------------------------------------
       case 'm':
-        if (args.qmgr != NULL) { fprintf (stderr, "Error: -m and -c are mutually exclusive\n"); goto _door_error; }
+        if (args.qmgr != NULL)    // (-c) was already specified, 
+        {                         //   error: mutually exclusive
+          fprintf (stderr, "Error: -m and -c are mutually exclusive\n"); 
+          goto _door_error; 
+        }
         args.qmgr     = strdup (optarg);
         args.connType = BINDING;
-        if (args.qmgr == NULL) { fprintf (stderr, "Error: Memory allocation failed\n"); goto _door_error; }
+        if (args.qmgr == NULL)
+        {
+          fprintf (stderr, "Error: Memory allocation failed\n");
+          goto _door_error;
+        }
         break;
 
+      // -------------------------------------------------------
+      // Connection mode: client (-c)
+      //   sets args.qmgr and args.connType to CLIENT
+      // -------------------------------------------------------  
       case 'c':
-        if (args.qmgr != NULL) { fprintf (stderr, "Error: -m and -c are mutually exclusive\n"); goto _door_error; }
+        if (args.qmgr != NULL)    // (-m) was already specified, 
+        {                         //   error: mutually exclusive
+          fprintf (stderr, "Error: -m and -c are mutually exclusive\n");
+          goto _door_error;
+        }
         args.qmgr     = strdup (optarg);
         args.connType = CLIENT;
-        if (args.qmgr == NULL) { fprintf (stderr, "Error: Memory allocation failed\n"); goto _door_error; }
+        if (args.qmgr == NULL)
+        {
+          fprintf (stderr, "Error: Memory allocation failed\n");
+          goto _door_error;
+        }
         break;
 
+      // -------------------------------------------------------  
+      // Remote queue manager for PCF execution (-r)
+      //   sets args.remQmgr
+      // -------------------------------------------------------
       case 'r':
         args.remQmgr = strdup (optarg);
         if (args.remQmgr == NULL)
@@ -113,7 +155,20 @@ int cmdlParse (int argc, char *argv[])
         }
         break;
 
-      case 'l':
+      // -------------------------------------------------------
+      // Log file (-l)
+      //   sets args.logFile
+      // -------------------------------------------------------
+      case 'l':   // only allow AMQERR01, AMQERR02, AMQERR03, 
+        {         //   with optional .LOG suffix
+          if (!(   strncmp (optarg, "AMQERR0", 7) == 0
+               && (optarg[7] >= '1' && optarg[7] <= '3')
+               && (optarg[8] == '\0' || strcmp (optarg + 8, ".LOG") == 0)))
+          {
+            fprintf (stderr, "Error: log file must be AMQERR01/2/3[.LOG]\n");
+            goto _door_error;
+          }
+        }
         args.logFile = strdup (optarg);
         if (args.logFile == NULL)
         {

@@ -1,11 +1,33 @@
+/* mqutil.h - IBM MQ utility interface.
+
+   This header defines the MQ connection structure and function prototypes
+   for the mqutil module.
+
+   Types:
+     mqconn_t - Structure holding MQ connection state
+
+   Functions:
+     mqInit             - Initialize MQ connection structure
+     mqConnect          - Connect to a queue manager
+     mqDisconnect       - Disconnect from a queue manager
+     mqReasonStr        - Get error message for a reason code
+     mqOpenQueue        - Open a queue
+     mqCloseQueue       - Close a queue opened with mqOpenQueue
+     mqInquireErrorLog  - Inquire error log entries from queue manager
+*/
+
 #ifndef MQUTIL_H
 #define MQUTIL_H
 
 #include <cmqc.h>
 
 /******************************************************************************/
-/* MQ Connection structure.                                                   */
+/*                               T Y P E S                                    */
 /******************************************************************************/
+
+// ---------------------------------------------------------
+// MQ connection state.
+// ---------------------------------------------------------
 typedef struct
 {
   MQHCONN hConn;                       // Connection handle.  
@@ -14,26 +36,17 @@ typedef struct
   MQLONG rc;                           // Reason code. 
 } mqconn_t;
 
-/* Initialize MQ connection structure.  */
-void mqInit       (mqconn_t *conn);
-
-/* Connect to queue manager.  */
-int  mqConnect    (mqconn_t *conn);
-
-/* Disconnect from queue manager.  */
-int  mqDisconnect (mqconn_t *conn);
-
-/* Get error message for reason code.  */
-const char *mqReasonStr (MQLONG reason_code);
-
-/* Open a queue. Pass NULL or "" for qmgr to target the local queue manager. */
-int mqOpenQueue  (mqconn_t *conn, const char *qname, const char *qmgr,
-                  MQLONG options, MQHOBJ *hObj);
-
-/* Close a queue opened with mqOpenQueue.  */
-int mqCloseQueue (mqconn_t *conn, MQHOBJ *hObj);
-
-/* Inquire error log entries from queue manager.  */
-int mqInquireErrorLog (mqconn_t *conn);
+/******************************************************************************/
+/*                            P R O T O T Y P E S                             */
+/******************************************************************************/
+void        mqInit             (mqconn_t *conn);
+int         mqConnect          (mqconn_t *conn);
+int         mqDisconnect       (mqconn_t *conn);
+const char *mqReasonStr        (MQLONG reason_code);
+int         mqOpenQueue        (mqconn_t *conn, const char *qname,
+                                const char *qmgr, MQLONG options,
+                                MQHOBJ *hObj);
+int         mqCloseQueue       (mqconn_t *conn, MQHOBJ *hObj);
+int         mqInquireErrorLog  (mqconn_t *conn);
 
 #endif /* MQUTIL_H */
