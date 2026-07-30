@@ -96,27 +96,42 @@ $(TMP_DIR)mqreason.tmp: | $(TMP_DIR)
 	    } '                       \
 	| grep -v "^$$" > $@
 
-$(INC_DIR)mqreason.h: $(TMP_DIR)mqreason.tmp
+$(TMP_DIR)mqreason.h.0: $(TMP_DIR)mqreason.tmp
 	@ echo generating $@
-	@ $(PERL) -n \
-	  -e 'next unless /^\s*(\d+)\s+0x\w+\s+(l?rrcI_\S+)/;' \
-	  -e 'printf("#define %-40s %5d\n", $$2, $$1);'         \
-	  $< > $@
+	@ $(PERL) -ne  '{                                  \
+	   next unless /^\s*(\d+)\s+0x\w+\s+(l?rrcI_\S+)/; \
+	   printf("#define %-40s %5d\n", $$2, $$1);        }' $< > $@
 
-$(SRC_DIR)mqreason.c: $(TMP_DIR)mqreason.tmp
+$(TMP_DIR)mqreason.c.0: $(TMP_DIR)mqreason.tmp
 	@ echo generating $@
-	@ $(PERL) -n \
-	  -e '/^\s*\d+\s+0x\w+\s+(\S+)/ or next;'                   \
-	  -e 'my $$sym = $$1;'                                         \
-	  -e 'next unless $$sym =~ /^MQRC/ || $$sym =~ /^l?rrcI_/;'   \
-	  -e 'next if $$sym =~ /MQRC_CONVERTED_MSG_TOO_BIG/;'          \
-	  -e 'next if $$sym =~ /MQRC_PAGESET_FULL/;'                   \
-	  -e 'next if $$sym =~ /MQRCCF_QUIESCE_VALUE_ERROR/;'          \
-	  -e 'next if $$sym =~ /rrcI_NORMAL_CHANNEL_END_CONN/;'        \
-	  -e 'next if $$sym =~ /rrcI_CHANNEL_START_CONN/;'             \
-	  -e 'printf("    convert(%-40s) ;\n", $$sym);'               \
-	  $< > $@
+	@ $(PERL) -ne '{ \
+	    next unless /^\s*(\d+)\s+0x\w+\s+((?:MQRC|l?rrcI_)\S+)/x; \
+		next if $$2 =~ /MQRC_CONVERTED_MSG_TOO_BIG/;              \
+		next if $$2 =~ /MQRC_PAGESET_FULL/;                       \
+		next if $$2 =~ /MQRCCF_QUIESCE_VALUE_ERROR/;              \
+        next if $$2 =~ /rrcI_NORMAL_CHANNEL_END_CONN/;            \
+		next if $$2 =~ /rrcI_CHANNEL_START_CONN/;                 \
+	    printf("     convert(%-40s) ;\n", $$2);          }' $< > $@
 
+$(INC_DIR)mqreason.h: $(ETC_DIR)mqreason.hs $(TMP_DIR)mqreason.h.0 $(ETC_DIR)mqreason.he 
+	cat $^ > $@
+
+$(SRC_DIR)mqreason.c: $(ETC_DIR)mqreason.cs $(TMP_DIR)mqreason.c.0 $(ETC_DIR)mqreason.ce 
+	cat $^ > $@
+
+#$(TMP_DIR)mqreason.c: $(TMP_DIR)mqreason.tmp
+#	@ echo generating $@
+#	@ $(PERL) -n \
+#	  -e '/^\s*\d+\s+0x\w+\s+(\S+)/ or next;'                   \
+#	  -e 'my $$sym = $$1;'                                         \
+#	  -e 'next unless $$sym =~ /^MQRC/ || $$sym =~ /^l?rrcI_/;'   \
+#	  -e 'next if $$sym =~ /MQRC_CONVERTED_MSG_TOO_BIG/;'          \
+#	  -e 'next if $$sym =~ /MQRC_PAGESET_FULL/;'                   \
+#	  -e 'next if $$sym =~ /MQRCCF_QUIESCE_VALUE_ERROR/;'          \
+#	  -e 'next if $$sym =~ /rrcI_NORMAL_CHANNEL_END_CONN/;'        \
+#	  -e 'next if $$sym =~ /rrcI_CHANNEL_START_CONN/;'             \
+#	  -e 'printf("    convert(%-40s) ;\n", $$sym);'               \
+#	  $< > $@
 
 # ----------------------------------------------------------
 # Auto-generated header dependencies (produced by -MMD -MP)
