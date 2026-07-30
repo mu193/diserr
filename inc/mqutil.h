@@ -43,8 +43,8 @@ void        mqInit             (mqconn_t *conn);
 int         mqConnect          (mqconn_t *conn);
 int         mqDisconnect       (mqconn_t *conn);
 const char *mqReasonStr        (MQLONG reason_code);
-int         mqOpenQueue        (mqconn_t *conn, const char *qname,
-                                const char *qmgr, MQLONG options,
+int         mqOpenQueue        (mqconn_t *conn, const char *qName,
+                                const char *rQmgr, MQLONG options,
                                 MQHOBJ *hObj);
 int         mqCloseQueue       (mqconn_t *conn, MQHOBJ *hObj);
 int         mqInquireErrorLog  (mqconn_t *conn);

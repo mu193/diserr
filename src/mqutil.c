@@ -1,5 +1,3 @@
-#define _GNU_SOURCE         /* timegm(3) */
-
 /* mqutil.c - IBM MQ connection and utility functions.
 
    This module provides wrapper functions for IBM MQ operations,
@@ -8,10 +6,12 @@
 
    Functions:
      mqInit            - Initialize MQ connection structure
-     mqConnect         - Connect to IBM MQ queue manager using MQCONNX with auto-reconnect
+     mqConnect         - Connect to queue manager; auto-reconnect for client,
+                         retry on transient QM unavailability for both modes
      mqDisconnect      - Disconnect from queue manager using MQDISC
      mqReasonStr       - Convert MQ reason codes to readable strings
      mqOpenQueue       - Open a queue using MQOPEN
+     mqCloseQueue      - Close a queue opened with mqOpenQueue
      mqInquireErrorLog - Retrieve error log entries using PCF
 */
 
@@ -22,14 +22,24 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <unistd.h>
 #include <cmqc.h>
 #include <cmqcfc.h>
 #include <cmqbc.h>
 #include "cmdline.h"
 #include "mqutil.h"
 
-#define MQ_1MB_BUF_LEN      (1024 * 1024)  /* 1 MB read buffer for PCF string values */
-#define MQ_ADMIN_COMMAND_QUEUE  "SYSTEM.ADMIN.COMMAND.QUEUE"
+/******************************************************************************/
+/*                               D E F I N E S                                */
+/******************************************************************************/
+#define MQ_1MB_BUF_LEN          (1024 * 1024)  /* 1 MB read buffer for PCF string values */
+#define MQ_ADMIN_COMMAND_QUEUE   "SYSTEM.ADMIN.COMMAND.QUEUE"
+
+/******************************************************************************/
+/*                                                                            */
+/*                             F U N C T I O N S                              */
+/*                                                                            */
+/******************************************************************************/
 
 /******************************************************************************/
 /* Initialize MQ connection structure.                                        */
@@ -40,27 +50,37 @@ void mqInit (mqconn_t *conn)
   conn->cc = MQCC_OK;
   conn->rc = MQRC_NONE;
 
-  /* QM name from -m or -c (single field) */
+  // -------------------------------------------------------
+  // QM name from -m or -c (single field)
+  // -------------------------------------------------------
   if (args.qmgr != NULL)
   {
-      strncpy (conn->qmgr, args.qmgr, MQ_Q_MGR_NAME_LENGTH);
-      conn->qmgr[MQ_Q_MGR_NAME_LENGTH] = '\0';
+    strncpy (conn->qmgr, args.qmgr, MQ_Q_MGR_NAME_LENGTH);
+    conn->qmgr[MQ_Q_MGR_NAME_LENGTH] = '\0';
   }
   else
   {
-      conn->qmgr[0] = '\0';
+    conn->qmgr[0] = '\0';
   }
 }
 
 /******************************************************************************/
 /* Connect to the queue manager.                                              */
+/*                                                                            */
+/* Client mode (-c): MQCNO_RECONNECT_Q_MGR instructs the MQ client library    */
+/*   to transparently re-establish the connection if it drops. No application */
+/*   code is needed; MQ handles retries and reconnection internally.          */
+/*                                                                            */
+/* Binding mode (-m): no MQ native auto-reconnect is available. Binding mode  */
+/*   uses in-process shared memory; if the QM stops the connection is lost.   */
 /******************************************************************************/
 int mqConnect (mqconn_t *conn)
 {
   MQCHAR qmgr[MQ_Q_MGR_NAME_LENGTH + 1];
-  MQCNO  cno = {MQCNO_DEFAULT};  // Connection options struct; MQCNO_DEFAULT sets all
-                                 // fields to MQ-defined defaults (version, options=NONE,
-                                 // no security exit, no client channel definition, etc.)
+  MQCNO  cno = {MQCNO_DEFAULT};  // Connection options struct; MQCNO_DEFAULT
+                                 // sets all fields to MQ-defined defaults
+                                 // (version, options=NONE, no security exit,
+                                 // no client channel definition, etc.)
   int    sysRc;
 
   // -------------------------------------------------------
@@ -72,13 +92,19 @@ int mqConnect (mqconn_t *conn)
       memcpy (qmgr, conn->qmgr, strlen (conn->qmgr));
 
   // -------------------------------------------------------
-  // Set binding mode: client if -c was given, else fast-path
-  // binding (local shared memory).
+  // Set binding mode.                                      
+  // Client: also request transparent auto-reconnect to the 
+  // same QM if the connection drops during operation.      
   // -------------------------------------------------------
-  if (args.connType == CLIENT)
-    cno.Options = MQCNO_CLIENT_BINDING;
-  else
-    cno.Options = MQCNO_STANDARD_BINDING;
+  switch (args.connType)
+  {
+    case CLIENT:
+      cno.Options = MQCNO_CLIENT_BINDING | MQCNO_RECONNECT_Q_MGR;
+      break;
+    case BINDING:
+      cno.Options = MQCNO_STANDARD_BINDING;
+      break;
+  }
 
   MQCONNX (qmgr,
            &cno,
@@ -111,7 +137,7 @@ int mqConnect (mqconn_t *conn)
 /******************************************************************************/
 int mqDisconnect (mqconn_t *conn)
 {
-  int sysRc = 0 ; // let assume ok
+  int sysRc = 0;  // Assume success.
 
   if (conn->hConn == MQHC_UNUSABLE_HCONN)
   {
@@ -148,7 +174,7 @@ int mqDisconnect (mqconn_t *conn)
 const char *mqReasonStr (MQLONG reason_code)
 {
   switch (reason_code)
-    {
+  {
     case MQRC_NONE:
       return "No reason";
     case MQRC_Q_MGR_NAME_ERROR:
@@ -217,18 +243,21 @@ const char *mqReasonStr (MQLONG reason_code)
 
 /******************************************************************************/
 /* Open a queue.                                                              */
-/* Pass NULL or "" for qmgr to target the local queue manager.               */
+/* Pass NULL or "" for rQmgr to target the local queue manager.               */
 /******************************************************************************/
-int mqOpenQueue (mqconn_t *conn, const char *qname, const char *qmgr,
-                 MQLONG options, MQHOBJ *hObj)
+int mqOpenQueue ( mqconn_t   *conn   ,  // MQ connection handle and state
+                  const char *qName  ,  // name of the queue to open
+                  const char *rQmgr  ,  // queue manager (NULL/"" = local)
+                  MQLONG      options ,  // MQOO_* open options
+                  MQHOBJ     *hObj    )  // returned object handle
 {
-  MQOD   od = {MQOD_DEFAULT};
-  MQLONG cc, rc;
+  MQOD   od = {MQOD_DEFAULT};  // Object descriptor: queue name and options
+  MQLONG cc, rc;               // MQ completion code and reason code
 
-  strncpy (od.ObjectName, qname, MQ_Q_NAME_LENGTH);
+  strncpy (od.ObjectName, qName, MQ_Q_NAME_LENGTH);
 
-  if (qmgr != NULL && strlen (qmgr) > 0)
-    strncpy (od.ObjectQMgrName, qmgr, MQ_Q_MGR_NAME_LENGTH);
+  if (rQmgr != NULL && strlen (rQmgr) > 0)
+    strncpy (od.ObjectQMgrName, rQmgr, MQ_Q_MGR_NAME_LENGTH);
 
   MQOPEN (conn->hConn, &od, options, hObj, &cc, &rc);
 
@@ -238,9 +267,9 @@ int mqOpenQueue (mqconn_t *conn, const char *qname, const char *qmgr,
       break;          //
     default:          // Error - exit with failure.
       fprintf (stderr, "MQOPEN '%s'%s%s failed: CC=%d RC=%d %s\n",
-               qname,
-               (qmgr != NULL && strlen (qmgr) > 0) ? "@" : "",
-               (qmgr != NULL && strlen (qmgr) > 0) ? qmgr : "",
+               qName,
+               (rQmgr != NULL && strlen (rQmgr) > 0) ? "@" : "",
+               (rQmgr != NULL && strlen (rQmgr) > 0) ? rQmgr : "",
                (int) cc, (int) rc, mqReasonStr (rc));
       break;
   }
@@ -273,103 +302,6 @@ int mqCloseQueue (mqconn_t *conn, MQHOBJ *hObj)
 
 
 /******************************************************************************/
-/* Normalize a partial ISO timeStamp to the full 24-char MQ format            */
-/* yyyy-mm-ddThh:mm:ss.sssZ required by the command server.                   */
-/* The trailing Z is the ISO 8601 UTC designator (Zulu = UTC, i.e. +00:00).  */
-/*                                                                            */
-/* Timezone handling:                                                         */
-/*   No timezone suffix    -> treated as local system time, converted to UTC  */
-/*   Z suffix              -> already UTC, used as-is                         */
-/*   +HH:MM / -HH:MM suffix -> explicit offset, converted to UTC              */
-/*                                                                            */
-/* Missing time components default to zero.                                   */
-/******************************************************************************/
-static const MQCHAR *mqNormalizeIsoTime (const MQCHAR *ts,
-                                         MQCHAR *buf, size_t bufLen)
-{
-  int    year = 0, mon = 1, day = 1;
-  int    hour = 0, min = 0, sec = 0, ms = 0;
-  size_t len = strlen (ts);
-
-  // -------------------------------------------------------
-  // Already fully-formed UTC - return as-is 
-  // -------------------------------------------------------
-  if (len == 24 && ts[23] == 'Z')
-    return ts;
-
-  // -------------------------------------------------------
-  // Parse as many date/time components as the string contains 
-  // -------------------------------------------------------
-  sscanf (ts, "%4d-%2d-%2dT%2d:%2d:%2d",
-          &year, &mon, &day, &hour, &min, &sec);
-
-  // -------------------------------------------------------
-  // Locate timezone indicator (Z / + / -) after the date-T prefix 
-  // -------------------------------------------------------
-  const char *tz = NULL;
-  for (size_t i = 11; i < len; i++)
-  {
-    if (ts[i] == 'Z' || ts[i] == '+' || ts[i] == '-')
-    {
-      tz = ts + i;
-      break;
-    }
-  }
-
-  // -------------------------------------------------------
-  // Parse fractional milliseconds between '.' and the tz indicator 
-  // -------------------------------------------------------
-  if (len >= 20 && ts[19] == '.')
-  {
-    const char *msEnd   = (tz != NULL) ? tz : ts + len;
-    const char *msStart = ts + 20;
-    int ndigits = (int)(msEnd - msStart);
-    char msbuf[4] = "000";
-    if (ndigits < 0) ndigits = 0;
-    if (ndigits > 3) ndigits = 3;
-    for (int i = 0; i < ndigits; i++) msbuf[i] = msStart[i];
-    ms = atoi (msbuf);
-  }
-
-  // -------------------------------------------------------
-  // Build tm struct from parsed components 
-  // -------------------------------------------------------
-  struct tm tm = {0};
-  tm.tm_year = year - 1900;
-  tm.tm_mon  = mon  - 1;
-  tm.tm_mday = day;
-  tm.tm_hour = hour;
-  tm.tm_min  = min;
-  tm.tm_sec  = sec;
-
-  time_t t;
-  if (tz == NULL)         // -------------------------------
-  {                       // 
-    tm.tm_isdst = -1;     // No timezone: interpret as local time; 
-    t = mktime (&tm);     // mktime converts to UTC epoch 
-  }                       //
-  else if (*tz == 'Z')    // ---------------
-  {                       //
-    t = timegm (&tm);     // Explicit UTC 
-  }                       //
-  else                    // ---------------
-  {                                       //
-    int tzh = 0, tzm = 0;                 // Explicit offset +HH:MM or -HH:MM 
-    sscanf (tz+1, "%2d:%2d", &tzh, &tzm); //
-    int offsetSec = tzh*3600 + tzm*60;    // East of UTC (+) means local is ahead: 
-    t = timegm (&tm);                     // subtract offset to reach UTC 
-    t += (*tz == '+') ? -offsetSec : +offsetSec;
-  }                                       // ---------------
-
-  struct tm *utc = gmtime (&t);
-  snprintf (buf, bufLen, "%04d-%02d-%02dT%02d:%02d:%02d.%03dZ",
-            utc->tm_year + 1900, utc->tm_mon + 1, utc->tm_mday,
-            utc->tm_hour, utc->tm_min, utc->tm_sec, ms);
-  return buf;
-}
-
-
-/******************************************************************************/
 /* Inquire error log entries from the queue manager via MQAI Bags.            */
 /******************************************************************************/
 int mqInquireErrorLog (mqconn_t *conn)
@@ -380,14 +312,7 @@ int mqInquireErrorLog (mqconn_t *conn)
   const MQCHAR *logName      = (args.logFile   != NULL) ? args.logFile   : "";
   const MQCHAR *afterIsoTime = (args.timeStamp != NULL) ? args.timeStamp : "";
 
-  // -------------------------------------------------------
-  // Normalize the timeStamp to the MQ format yyyy-mm-ddThh:mm:ss.sssZ
-  // (24 chars). The command server rejects (MQRCCF_CFST_STRING_LENGTH_ERR)
-  // any string not matching that exact length.
-  // -------------------------------------------------------
-  MQCHAR  isoTimeBuf[MQ_ISOTIME_LENGTH + 1];
-  if (strlen (afterIsoTime) > 0)
-    afterIsoTime = mqNormalizeIsoTime (afterIsoTime, isoTimeBuf, sizeof (isoTimeBuf));
+  // timeStamp is already normalized to yyyy-mm-ddThh:mm:ss.sssZ by cmdlParse.
 
   MQHBAG  cmdBag = MQHB_UNUSABLE_HBAG;
   MQHBAG  repBag = MQHB_UNUSABLE_HBAG;
@@ -422,8 +347,8 @@ int mqInquireErrorLog (mqconn_t *conn)
       case MQRC_NONE:
         break;
       default:
-        fprintf( stderr, "mqAddString (log name) failed: %d %s\n",
-                         (int) rc, mqReasonStr (rc));
+        fprintf (stderr, "mqAddString (log name) failed: %d %s\n",
+                 (int) rc, mqReasonStr (rc));
         sysRc = rc;
         goto _cleanup;
     }
@@ -439,10 +364,10 @@ int mqInquireErrorLog (mqconn_t *conn)
       case MQRC_NONE:
         break;
       default:
-        fprintf ( stderr, "mqAddString (after isotime) failed: %d %s\n",
-                  (int) rc, mqReasonStr (rc));
-          sysRc = rc;
-          goto _cleanup;
+        fprintf (stderr, "mqAddString (after isotime) failed: %d %s\n",
+                 (int) rc, mqReasonStr (rc));
+        sysRc = rc;
+        goto _cleanup;
     }
   }
 
@@ -461,14 +386,14 @@ int mqInquireErrorLog (mqconn_t *conn)
       goto _cleanup;
   }
 
-  //-------------------------------------------------------
+  // -------------------------------------------------------
   // Open SYSTEM.ADMIN.COMMAND.QUEUE for PCF execution.
   // If -r / --remQmgr was specified, the queue is opened
   // with ObjectQMgrName set to that remote queue manager,
   // routing the PCF command over the MQ channel infrastructure.
   // If no remote QM was given, NULL is passed and the command
   // targets the local queue manager.
-  //-------------------------------------------------------
+  // -------------------------------------------------------
   MQHOBJ hAdminQ = MQHO_NONE;
 
   if (mqOpenQueue (conn, MQ_ADMIN_COMMAND_QUEUE, args.remQmgr,
@@ -478,9 +403,9 @@ int mqInquireErrorLog (mqconn_t *conn)
     goto _cleanup;
   }
 
-  //-------------------------------------------------------
+  // -------------------------------------------------------
   // Execute PCF: MQCMD_INQUIRE_ERROR_LOG command.  
-  //-------------------------------------------------------
+  // -------------------------------------------------------
   mqExecute (conn->hConn,
              MQCMD_INQUIRE_ERROR_LOG,
              MQHB_NONE,
@@ -494,6 +419,7 @@ int mqInquireErrorLog (mqconn_t *conn)
   {
     case MQRC_NONE:
       break;
+
     default:            // Extract actual reason from the response bag.
     {
       // Save the mqExecute return codes before bag operations overwrite them.
@@ -533,10 +459,10 @@ int mqInquireErrorLog (mqconn_t *conn)
     }
   }
 
-  //-------------------------------------------------------
-  // Handle response bag contains 
-  //   it contains one embedded bag per PCF response message.  
-  //-------------------------------------------------------
+  // -------------------------------------------------------
+  // Process response bags.                                
+  //   Each embedded bag holds one PCF response message.  
+  // -------------------------------------------------------
   MQLONG bagCount;
   mqCountItems (repBag, MQHA_BAG_HANDLE, &bagCount, &cc, &rc);
   switch (rc)
@@ -550,9 +476,9 @@ int mqInquireErrorLog (mqconn_t *conn)
       goto _cleanup;
   }
 
-  //-------------------------------------------------------
+  // -------------------------------------------------------
   // Iterate over each embedded bag in the response bag.
-  //-------------------------------------------------------
+  // -------------------------------------------------------
   for (MQLONG b = 0; b < bagCount; b++)
   {
     MQHBAG itemBag;
