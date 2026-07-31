@@ -27,6 +27,7 @@ INC_DIR = inc/
 OBJ_DIR = obj/
 BIN_DIR = bin/
 TMP_DIR = tmp/
+ETC_DIR = etc/
 
 # ----------------------------------------------------------
 # Target executable
@@ -36,7 +37,7 @@ TARGET = $(BIN_DIR)diserr
 # ----------------------------------------------------------
 # Source and object files
 # ----------------------------------------------------------
-SRC_FILES = main.c cmdline.c mqutil.c
+SRC_FILES = main.c cmdline.c mqutil.c mqreason.c
 
 SOURCES = $(addprefix $(SRC_DIR), $(SRC_FILES))
 OBJECTS = $(addprefix $(OBJ_DIR), $(SRC_FILES:.c=.o))
@@ -109,29 +110,16 @@ $(TMP_DIR)mqreason.c.0: $(TMP_DIR)mqreason.tmp
 		next if $$2 =~ /MQRC_CONVERTED_MSG_TOO_BIG/;              \
 		next if $$2 =~ /MQRC_PAGESET_FULL/;                       \
 		next if $$2 =~ /MQRCCF_QUIESCE_VALUE_ERROR/;              \
+		next if $$2 =~ /MQRCCF_IPADDR_ERROR/;                     \
         next if $$2 =~ /rrcI_NORMAL_CHANNEL_END_CONN/;            \
 		next if $$2 =~ /rrcI_CHANNEL_START_CONN/;                 \
 	    printf("     convert(%-40s) ;\n", $$2);          }' $< > $@
 
-$(INC_DIR)mqreason.h: $(ETC_DIR)mqreason.hs $(TMP_DIR)mqreason.h.0 $(ETC_DIR)mqreason.he 
+$(INC_DIR)mqreason.h: $(ETC_DIR)mqreason.sh $(TMP_DIR)mqreason.h.0 $(ETC_DIR)mqreason.eh 
 	cat $^ > $@
 
-$(SRC_DIR)mqreason.c: $(ETC_DIR)mqreason.cs $(TMP_DIR)mqreason.c.0 $(ETC_DIR)mqreason.ce 
+$(SRC_DIR)mqreason.c: $(ETC_DIR)mqreason.sc $(TMP_DIR)mqreason.c.0 $(ETC_DIR)mqreason.ec 
 	cat $^ > $@
-
-#$(TMP_DIR)mqreason.c: $(TMP_DIR)mqreason.tmp
-#	@ echo generating $@
-#	@ $(PERL) -n \
-#	  -e '/^\s*\d+\s+0x\w+\s+(\S+)/ or next;'                   \
-#	  -e 'my $$sym = $$1;'                                         \
-#	  -e 'next unless $$sym =~ /^MQRC/ || $$sym =~ /^l?rrcI_/;'   \
-#	  -e 'next if $$sym =~ /MQRC_CONVERTED_MSG_TOO_BIG/;'          \
-#	  -e 'next if $$sym =~ /MQRC_PAGESET_FULL/;'                   \
-#	  -e 'next if $$sym =~ /MQRCCF_QUIESCE_VALUE_ERROR/;'          \
-#	  -e 'next if $$sym =~ /rrcI_NORMAL_CHANNEL_END_CONN/;'        \
-#	  -e 'next if $$sym =~ /rrcI_CHANNEL_START_CONN/;'             \
-#	  -e 'printf("    convert(%-40s) ;\n", $$sym);'               \
-#	  $< > $@
 
 # ----------------------------------------------------------
 # Auto-generated header dependencies (produced by -MMD -MP)
