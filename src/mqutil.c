@@ -9,7 +9,6 @@
      mqConnect         - Connect to queue manager; auto-reconnect for client,
                          retry on transient QM unavailability for both modes
      mqDisconnect      - Disconnect from queue manager using MQDISC
-     mqReasonStr       - Convert MQ reason codes to readable strings
      mqOpenQueue       - Open a queue using MQOPEN
      mqCloseQueue      - Close a queue opened with mqOpenQueue
      mqInquireErrorLog - Retrieve error log entries using PCF
@@ -27,6 +26,7 @@
 #include <cmqcfc.h>
 #include <cmqbc.h>
 #include "cmdline.h"
+#include "mqreason.h"
 #include "mqutil.h"
 
 /******************************************************************************/
@@ -123,7 +123,7 @@ int mqConnect (mqconn_t *conn)
     default:
       fprintf (stderr, "MQCONNX failed with reason code %d: %s\n",
                (int) conn->rc,
-               mqReasonStr (conn->rc));
+               mqrc2str (conn->rc));
       sysRc = conn->rc;
       goto _door;
   }
@@ -159,7 +159,7 @@ int mqDisconnect (mqconn_t *conn)
     default:
       fprintf (stderr, "MQDISC failed with reason code %d: %s\n",
                (int) conn->rc,
-               mqReasonStr (conn->rc));
+               mqrc2str (conn->rc));
       sysRc = conn->rc;
       goto _door;
   }
@@ -167,79 +167,6 @@ int mqDisconnect (mqconn_t *conn)
   _door:
     return sysRc;
 }
-
-/******************************************************************************/
-/* Get human-readable string for MQ reason code.                            */
-/******************************************************************************/
-const char *mqReasonStr (MQLONG reason_code)
-{
-  switch (reason_code)
-  {
-    case MQRC_NONE:
-      return "No reason";
-    case MQRC_Q_MGR_NAME_ERROR:
-      return "Queue manager name error";
-    case MQRC_Q_MGR_NOT_AVAILABLE:
-      return "Queue manager not available";
-    case MQRC_CONNECTION_BROKEN:
-      return "Connection broken";
-    case MQRC_HCONN_ERROR:
-      return "Connection handle error";
-    case MQRC_Q_MGR_STOPPING:
-      return "Queue manager stopping";
-    case MQRC_Q_MGR_QUIESCING:
-      return "Queue manager quiescing";
-    case MQRC_CONNECTION_QUIESCING:
-      return "Connection quiescing";
-    case MQRC_CONNECTION_NOT_AUTHORIZED:
-      return "Connection not authorized";
-    case MQRC_ALREADY_CONNECTED:
-      return "Already connected";
-    case MQRC_NOT_AUTHORIZED:
-      return "Not authorized";
-    case MQRC_UNKNOWN_OBJECT_NAME:
-      return "Unknown object name";
-    case MQRC_OBJECT_IN_USE:
-      return "Object in use";
-    case MQRC_OBJECT_TYPE_ERROR:
-      return "Object type error";
-    case MQRC_HOBJ_ERROR:
-      return "Object handle error";
-    case MQRC_Q_FULL:
-      return "Queue full";
-    case MQRC_NO_MSG_AVAILABLE:
-      return "No message available";
-    case MQRC_TRUNCATED_MSG_FAILED:
-      return "Truncated message";
-    case MQRC_TRUNCATED_MSG_ACCEPTED:
-      return "Truncated message accepted";
-    case MQRC_OPTIONS_ERROR:
-      return "Options error";
-    case MQRC_SELECTOR_ERROR:
-      return "Selector error";
-    case MQRC_OBJECT_DAMAGED:
-      return "Object damaged";
-    case MQRC_STORAGE_NOT_AVAILABLE:
-      return "Storage not available";
-    case MQRC_BUFFER_ERROR:
-      return "Buffer error";
-    case MQRC_BUFFER_LENGTH_ERROR:
-      return "Buffer length error";
-    case MQRC_INSUFFICIENT_BUFFER:
-      return "Insufficient buffer";
-    case MQRC_CMD_SERVER_NOT_AVAILABLE:
-      return "Command server not available";
-    case MQRC_MSG_TOO_BIG_FOR_Q:
-      return "Message too big for queue";
-    case MQRCCF_CFST_STRING_LENGTH_ERR:
-      return "PCF string parameter length error";
-    case MQRCCF_NONE_FOUND:
-      return "No matching entries found";
-    default:
-      return "Unknown reason code";
-    }
-}
-
 
 /******************************************************************************/
 /* Open a queue.                                                              */
@@ -270,7 +197,7 @@ int mqOpenQueue ( mqconn_t   *conn   ,  // MQ connection handle and state
                qName,
                (rQmgr != NULL && strlen (rQmgr) > 0) ? "@" : "",
                (rQmgr != NULL && strlen (rQmgr) > 0) ? rQmgr : "",
-               (int) cc, (int) rc, mqReasonStr (rc));
+               (int) cc, (int) rc, mqrc2str (rc));
       break;
   }
 
@@ -293,7 +220,7 @@ int mqCloseQueue (mqconn_t *conn, MQHOBJ *hObj)
       break;
     default:
       fprintf (stderr, "MQCLOSE failed: CC=%d RC=%d %s\n",
-               (int) cc, (int) rc, mqReasonStr (rc));
+               (int) cc, (int) rc, mqrc2str (rc));
       break;
   }
 
@@ -329,7 +256,7 @@ int mqInquireErrorLog (mqconn_t *conn)
       break;
     default:
       fprintf (stderr, "mqCreateBag (command) failed: %d %s\n",
-               (int) rc, mqReasonStr (rc));
+               (int) rc, mqrc2str (rc));
       sysRc = rc;
       goto _cleanup;
   }
@@ -348,7 +275,7 @@ int mqInquireErrorLog (mqconn_t *conn)
         break;
       default:
         fprintf (stderr, "mqAddString (log name) failed: %d %s\n",
-                 (int) rc, mqReasonStr (rc));
+                 (int) rc, mqrc2str (rc));
         sysRc = rc;
         goto _cleanup;
     }
@@ -365,7 +292,7 @@ int mqInquireErrorLog (mqconn_t *conn)
         break;
       default:
         fprintf (stderr, "mqAddString (after isotime) failed: %d %s\n",
-                 (int) rc, mqReasonStr (rc));
+                 (int) rc, mqrc2str (rc));
         sysRc = rc;
         goto _cleanup;
     }
@@ -381,7 +308,7 @@ int mqInquireErrorLog (mqconn_t *conn)
       break;
     default:
       fprintf (stderr, "mqCreateBag (response) failed: %d %s\n",
-               (int) rc, mqReasonStr (rc));
+               (int) rc, mqrc2str (rc));
       sysRc = rc;
       goto _cleanup;
   }
@@ -451,7 +378,7 @@ int mqInquireErrorLog (mqconn_t *conn)
 
         default:                          // Genuine command server error.
           fprintf (stderr, "mqExecute failed: command server cc=%d rc=%d %s\n",
-                   (int) cmdSrvCC, (int) cmdSrvRC, mqReasonStr (cmdSrvRC));
+                   (int) cmdSrvCC, (int) cmdSrvRC, mqrc2str (cmdSrvRC));
           sysRc = cmdSrvRC;
           break;
       }
@@ -471,7 +398,7 @@ int mqInquireErrorLog (mqconn_t *conn)
       break;
     default:
       fprintf (stderr, "mqCountItems failed: %d %s\n",
-               (int) rc, mqReasonStr (rc));
+               (int) rc, mqrc2str (rc));
       sysRc = rc;
       goto _cleanup;
   }
@@ -523,7 +450,7 @@ int mqInquireErrorLog (mqconn_t *conn)
               break;
             default:
               fprintf (stderr, "  mqInquireString selector %d failed: %d %s\n",
-                       (int) selector, (int) rc, mqReasonStr (rc));
+                       (int) selector, (int) rc, mqrc2str (rc));
               break;
           }
           break;
@@ -544,7 +471,7 @@ int mqInquireErrorLog (mqconn_t *conn)
               break;
             default:
               fprintf (stderr, "  mqInquireInteger selector %d failed: %d %s\n",
-                       (int) selector, (int) rc, mqReasonStr (rc));
+                       (int) selector, (int) rc, mqrc2str (rc));
               break;
           }
           break;

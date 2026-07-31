@@ -10,7 +10,6 @@
      mqInit             - Initialize MQ connection structure
      mqConnect          - Connect to a queue manager
      mqDisconnect       - Disconnect from a queue manager
-     mqReasonStr        - Get error message for a reason code
      mqOpenQueue        - Open a queue
      mqCloseQueue       - Close a queue opened with mqOpenQueue
      mqInquireErrorLog  - Inquire error log entries from queue manager
@@ -42,7 +41,6 @@ typedef struct
 void        mqInit             (mqconn_t *conn);
 int         mqConnect          (mqconn_t *conn);
 int         mqDisconnect       (mqconn_t *conn);
-const char *mqReasonStr        (MQLONG reason_code);
 int         mqOpenQueue        (mqconn_t *conn, const char *qName,
                                 const char *rQmgr, MQLONG options,
                                 MQHOBJ *hObj);
