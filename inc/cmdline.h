@@ -39,6 +39,7 @@ typedef struct
   char       *logFile;    // error log file name (-l)
   char       *timeStamp;  // ISO 8601 timestamp (-t) for filtering log entries
   char       *remQmgr;    // remote queue manager name (-r) for PCF execution
+  int         verbose;    // verbose output (-v): print all selectors
 } cmdline_t;
 
 extern cmdline_t args;

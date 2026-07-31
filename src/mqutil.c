@@ -26,6 +26,7 @@
 #include <cmqcfc.h>
 #include <cmqbc.h>
 #include "cmdline.h"
+#include "mqconvert.h"
 #include "mqreason.h"
 #include "mqutil.h"
 
@@ -115,8 +116,9 @@ int mqConnect (mqconn_t *conn)
   switch (conn->rc)
   {
     case MQRC_NONE:
-      printf ("Connected to queue manager: %s\n",
-              strlen (conn->qmgr) > 0 ? conn->qmgr : "(default)");
+      if (args.verbose)
+        printf ("Connected to queue manager: %s\n",
+                strlen (conn->qmgr) > 0 ? conn->qmgr : "(default)");
       sysRc = 0;
       goto _door;
 
@@ -152,7 +154,8 @@ int mqDisconnect (mqconn_t *conn)
   switch (conn->rc)
   {
     case MQRC_NONE:
-      printf ("Disconnected from queue manager\n");
+      if (args.verbose)
+        printf ("Disconnected from queue manager\n");
       sysRc = 0;
       goto _door;
 
@@ -438,9 +441,15 @@ int mqInquireErrorLog (mqconn_t *conn)
           switch (rc)
           {
             case MQRC_NONE:
-              printf ("  [%d] %.*s\n", (int) selector,
-                      (int) strLen, value);
+            {
+              const char *sname = mqselector2str ((int) selector);
+              if (args.verbose)
+                printf ("  [%s] %.*s\n", sname, (int) strLen, value);
+              else if (selector == MQCACF_ERROR_LOG_RECORD ||
+                       selector == MQCACF_ERROR_LOG_ISOTIME)
+                printf ("%.*s\n", (int) strLen, value);
               break;
+            }
             case MQRC_STRING_TRUNCATED:
               fprintf (stderr, "  Warning: selector %d string truncated"
                                " (%d bytes returned)\n",
@@ -467,8 +476,12 @@ int mqInquireErrorLog (mqconn_t *conn)
           switch (rc)
           {
             case MQRC_NONE:
-              printf ("  [%d] %d\n", (int) selector, (int) value);
+            {
+              const char *sname = mqselector2str ((int) selector);
+              if (args.verbose)
+                printf ("  [%s] %d\n", sname, (int) value);
               break;
+            }
             default:
               fprintf (stderr, "  mqInquireInteger selector %d failed: %d %s\n",
                        (int) selector, (int) rc, mqrc2str (rc));

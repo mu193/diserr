@@ -47,6 +47,7 @@ void cmdlInit (void)
   args.logFile   = NULL;
   args.timeStamp = NULL;
   args.remQmgr   = NULL;
+  args.verbose   = 0;
 }
 
 /******************************************************************************/
@@ -61,6 +62,7 @@ void cmdlUsage (const char *progname)
   printf ("  -r, --remQmgr     <name>   Execute PCF on this remote queue manager\n");
   printf ("  -l, --logFile     <name>   Error log file name (e.g. AMQERR01)\n");
   printf ("  -t, --timeStamp   <iso>    Show entries after this ISO 8601 timeStamp\n");
+  printf ("  -v, --verbose              Print all PCF selectors (default: log records only)\n");
   printf ("  -h, --help                 Display this help message\n");
   printf ("\nNote: -m and -c are mutually exclusive.\n");
   printf ("\nTimestamp format (-t):\n");
@@ -233,10 +235,11 @@ int cmdlParse (int argc, char *argv[])
     {"logFile",     required_argument, 0, 'l'},
     {"timeStamp",   required_argument, 0, 't'},
     {"help",        no_argument,       0, 'h'},
+    {"verbose",     no_argument,       0, 'v'},
     {0, 0, 0, 0}
   };
 
-  while ((opt = getopt_long (argc, argv, "m:c:r:l:t:h",
+  while ((opt = getopt_long (argc, argv, "m:c:r:l:t:hv",
                              long_options, &option_index)) != -1)
   {
     switch (opt)
@@ -331,6 +334,10 @@ int cmdlParse (int argc, char *argv[])
             goto _door_error;
           }
         }
+        break;
+
+      case 'v':
+        args.verbose = 1;
         break;
 
       // -------------------------------------------------------

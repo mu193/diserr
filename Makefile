@@ -37,7 +37,7 @@ TARGET = $(BIN_DIR)diserr
 # ----------------------------------------------------------
 # Source and object files
 # ----------------------------------------------------------
-SRC_FILES = main.c cmdline.c mqutil.c mqreason.c
+SRC_FILES = main.c cmdline.c mqutil.c mqreason.c mqconvert.c
 
 SOURCES = $(addprefix $(SRC_DIR), $(SRC_FILES))
 OBJECTS = $(addprefix $(OBJ_DIR), $(SRC_FILES:.c=.o))
