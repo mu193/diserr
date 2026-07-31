@@ -78,11 +78,10 @@ void mqInit (mqconn_t *conn)
 int mqConnect (mqconn_t *conn)
 {
   MQCHAR qmgr[MQ_Q_MGR_NAME_LENGTH + 1];
-  MQCNO  cno = {MQCNO_DEFAULT};  // Connection options struct; MQCNO_DEFAULT
-                                 // sets all fields to MQ-defined defaults
-                                 // (version, options=NONE, no security exit,
-                                 // no client channel definition, etc.)
+  MQCNO  cno = {MQCNO_DEFAULT};  // Connection options struct.
   int    sysRc;
+
+  cno.Version = MQCNO_CURRENT_VERSION;
 
   // -------------------------------------------------------
   // Prepare queue manager name. 
@@ -100,7 +99,7 @@ int mqConnect (mqconn_t *conn)
   switch (args.connType)
   {
     case CLIENT:
-      cno.Options = MQCNO_CLIENT_BINDING | MQCNO_RECONNECT_Q_MGR;
+      cno.Options = MQCNO_CLIENT_BINDING ;
       break;
     case BINDING:
       cno.Options = MQCNO_STANDARD_BINDING;

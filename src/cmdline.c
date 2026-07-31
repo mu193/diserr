@@ -346,15 +346,15 @@ int cmdlParse (int argc, char *argv[])
       case '?':
       case 'h':
         cmdlUsage (argv[0]);
-        goto _door_ok;
+        goto _door_error;
 
       default:
         goto _door_error;
     }
   }
 
-  _door_ok:
-    return 0;
+//_door_ok:
+  return 0;
 
   _door_error:
     return 1;
