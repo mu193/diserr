@@ -27,6 +27,7 @@
 #include <cmqbc.h>
 #include "cmdline.h"
 #include "mqconvert.h"
+#include "osutil.h"
 #include "mqreason.h"
 #include "mqutil.h"
 
@@ -446,7 +447,52 @@ int mqInquireErrorLog (mqconn_t *conn)
                 printf ("  [%s] %.*s\n", sname, (int) strLen, value);
               else if (selector == MQCACF_ERROR_LOG_RECORD ||
                        selector == MQCACF_ERROR_LOG_ISOTIME)
-                printf ("%.*s\n", (int) strLen, value);
+              {
+                switch (args.format)
+                {
+                  case FMT_TEXT:
+                    printf ("%.*s\n", (int) strLen, value);
+                    break;
+
+                  case FMT_JSON:
+                  {
+                    char *line = malloc ((size_t) strLen + 1);
+                    char *json = NULL;
+                    if (line == NULL)
+                    {
+                      fprintf (stderr, "Error: Memory allocation failed\n");
+                      sysRc = 1;
+                      goto _cleanup;
+                    }
+
+                    memcpy (line, value, (size_t) strLen);
+                    line[strLen] = '\0';
+
+                    if (osutilMqrcTextToJson (line, &json) != 0)
+                    {
+                      fprintf (stderr, "Error: failed to convert output to JSON\n");
+                      free (line);
+                      sysRc = 1;
+                      goto _cleanup;
+                    }
+
+                    free (line);
+                    if (json != NULL)
+                    {
+                      fputs (json, stdout);
+                      if (json[0] != '\0' && json[strlen (json) - 1] != '\n')
+                        fputc ('\n', stdout);
+                      free (json);
+                    }
+                    break;
+                  }
+
+                  default:
+                    fprintf (stderr, "Error: unsupported output format\n");
+                    sysRc = 1;
+                    goto _cleanup;
+                }
+              }
               break;
             }
             case MQRC_STRING_TRUNCATED:

@@ -30,6 +30,15 @@ typedef enum
 } connType_t;
 
 // ---------------------------------------------------------
+// Output format selected by -f / --format.
+// ---------------------------------------------------------
+typedef enum
+{
+  FMT_TEXT = 1,
+  FMT_JSON = 2
+} formatType_t;
+
+// ---------------------------------------------------------
 // Parsed command line arguments. 
 // ---------------------------------------------------------
 typedef struct
@@ -40,6 +49,7 @@ typedef struct
   char       *timeStamp;  // ISO 8601 timestamp (-t) for filtering log entries
   char       *remQmgr;    // remote queue manager name (-r) for PCF execution
   int         verbose;    // verbose output (-v): print all selectors
+  formatType_t format;    // output format (-f): text (default) or json
 } cmdline_t;
 
 extern cmdline_t args;

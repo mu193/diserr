@@ -48,6 +48,7 @@ void cmdlInit (void)
   args.timeStamp = NULL;
   args.remQmgr   = NULL;
   args.verbose   = 0;
+  args.format    = FMT_TEXT;
 }
 
 /******************************************************************************/
@@ -62,6 +63,7 @@ void cmdlUsage (const char *progname)
   printf ("  -r, --remQmgr     <name>   Execute PCF on this remote queue manager\n");
   printf ("  -l, --logFile     <name>   Error log file name (e.g. AMQERR01)\n");
   printf ("  -t, --timeStamp   <iso>    Show entries after this ISO 8601 timeStamp\n");
+  printf ("  -f, --format      <fmt>    Output format: text (default) or json\n");
   printf ("  -v, --verbose              Print all PCF selectors (default: log records only)\n");
   printf ("  -h, --help                 Display this help message\n");
   printf ("\nNote: -m and -c are mutually exclusive.\n");
@@ -234,12 +236,13 @@ int cmdlParse (int argc, char *argv[])
     {"remQmgr",     required_argument, 0, 'r'},
     {"logFile",     required_argument, 0, 'l'},
     {"timeStamp",   required_argument, 0, 't'},
+    {"format",      required_argument, 0, 'f'},
     {"help",        no_argument,       0, 'h'},
     {"verbose",     no_argument,       0, 'v'},
     {0, 0, 0, 0}
   };
 
-  while ((opt = getopt_long (argc, argv, "m:c:r:l:t:hv",
+  while ((opt = getopt_long (argc, argv, "m:c:r:l:t:f:hv",
                              long_options, &option_index)) != -1)
   {
     switch (opt)
@@ -336,6 +339,18 @@ int cmdlParse (int argc, char *argv[])
         }
         break;
 
+      case 'f':
+        if (strcmp (optarg, "text") == 0)
+          args.format = FMT_TEXT;
+        else if (strcmp (optarg, "json") == 0)
+          args.format = FMT_JSON;
+        else
+        {
+          fprintf (stderr, "Error: -f/--format must be 'text' or 'json'\n");
+          goto _door_error;
+        }
+        break;
+
       case 'v':
         args.verbose = 1;
         break;
@@ -343,8 +358,11 @@ int cmdlParse (int argc, char *argv[])
       // -------------------------------------------------------
       // Help (-h) / usage
       // -------------------------------------------------------
-      case '?':
       case 'h':
+        cmdlUsage (argv[0]);
+        return 1;
+
+      case '?':
         cmdlUsage (argv[0]);
         goto _door_error;
 
