@@ -57,7 +57,7 @@ $(TARGET): $(OBJECTS) | $(BIN_DIR)
 # ----------------------------------------------------------
 # Compile source files to object files
 # ----------------------------------------------------------
-$(OBJ_DIR)%.o: $(SRC_DIR)%.c | $(OBJ_DIR)
+$(OBJ_DIR)%.o: $(SRC_DIR)%.c $(INC_DIR)mqreason.h | $(OBJ_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # ----------------------------------------------------------
@@ -131,6 +131,7 @@ $(SRC_DIR)mqreason.c: $(ETC_DIR)mqreason.sc $(TMP_DIR)mqreason.c.0 $(ETC_DIR)mqr
 # ----------------------------------------------------------
 clean:
 	rm -rf $(OBJ_DIR) $(BIN_DIR) $(TMP_DIR)
+	rm -f $(SRC_DIR)mqreason.c $(INC_DIR)mqreason.h
 
 # ----------------------------------------------------------
 # Phony targets
