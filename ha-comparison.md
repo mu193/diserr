@@ -1,4 +1,4 @@
-# HA Solutions for IBM MQ on Linux x86 VMs
+# HA Solutions for IBM MQ on Linux x87 VMs
 
 ## Overview
 
@@ -62,7 +62,8 @@ Node A (active)                Node B (standby)
   - NFS v4 with locking enabled
   - GPFS (IBM Spectrum Scale)
   - GFS2
-  - plain NFS v3 is not sufficient
+  - plain NFS v3 is not sufficient 
+  — also see [IBM Doc](https://www.ibm.com/support/pages/testing-statement-ibm-mq-multi-instance-queue-manager-file-systems?view=full#fs_not_meeting_requirements)
 - Both nodes must run the same MQ version and fix pack level.
 - Shared filesystem must be mounted on both nodes before starting either instance.
 
@@ -86,4 +87,41 @@ Node A (active)                Node B (standby)
 - No replication — if the shared storage fails, both nodes are affected.
 - Failover time is longer than Native HA or RDQM due to polling interval.
 - Only 2 nodes supported (1 active + 1 standby).
+
+### Split-Brain
+
+Split-brain occurs when both nodes lose communication with each other but both remain running. Each node believes the other has failed and attempts to become the active instance — resulting in two active queue managers writing to the same shared filesystem simultaneously, which causes data corruption.
+
+**How multi-instance prevents split-brain:**
+
+Multi-instance queue manager relies entirely on the shared filesystem's lock mechanism to prevent this. The active instance holds an exclusive lock on a lock file in the shared data directory. The standby can only take over by acquiring that lock. As long as the shared filesystem enforces POSIX locks correctly, only one instance can hold the lock at a time — split-brain is not possible at the MQ level.
+
+**When split-brain can still occur:**
+
+- If the shared filesystem itself has a bug or misconfiguration that grants the lock to both nodes.
+- GFS2 and GPFS are safer because their locking is cluster-aware, not server-dependent.
+
+**Key conclusion:** do not use NFS for production multi-instance deployments — use GPFS or GFS2.
+
+---
+
+### Data Center Requirements
+
+Two MQ nodes are required (active + standby), each in a separate DC. The shared filesystem must span both DCs.
+
+**With GPFS (Spectrum Scale):**
+- GPFS also requires quorum among its quorum nodes to survive a DC failure without split-brain.
+- With 1 node per DC, a tie-breaker quorum node in a third location is needed — the same constraint as GFS2.
+
+**With GFS2:**
+- GFS2 requires cluster quorum, which a 2-node stretched cluster cannot achieve alone after a DC failure.
+- Either a **third DC** hosting a quorum device (`corosync-qnetd`) or a **third full cluster node** is required.
+
+| Filesystem | Min DCs | Quorum device needed |
+|---|---|---|
+| GPFS / Spectrum Scale | 2 + quorum node (tie-breaker) | Yes (3rd location) |
+| GFS2 | 2 + quorum device | Yes (3rd location) |
+| GFS2 with 3 nodes | 3 | No |
+
+Network latency between DCs directly affects performance — every MQ write to the shared filesystem is synchronous, so latency above ~5ms will impact throughput.
 
