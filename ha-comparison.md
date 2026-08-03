@@ -1,6 +1,8 @@
 # HA Solutions for IBM MQ on Linux x86 VMs
 
-## IBM MQ Native HA Options
+## Overview
+
+### IBM MQ Native HA Options
 
 | Solution | Notes |
 |---|---|
@@ -10,46 +12,78 @@
 
 ---
 
-## Infrastructure / Platform HA Options
+### Infrastructure / Platform HA Options
 
 | Solution | Notes |
 |---|---|
-| **Pacemaker + shared storage (GFS2/SAN)** | Classic Linux HA cluster, active/passive, not MQ-specific |
-| **Pacemaker + DRBD (without RDQM)** | Block-level replication, active/passive, manual MQ resource agent |
+| **Pacemaker + shared storage (GFS2/SAN)** | Classic Linux HA cluster, active/passive, requires MQ resource agent |
 | **VMware HA / vSphere HA** | Hypervisor-level restart on host failure, not MQ-aware |
-| **VMware FT (Fault Tolerance)** | Lockstep VM mirroring, near-zero downtime, significant overhead |
-| **Hyperscaler** (AWS/Azure/GCP) | MQ on cloud VMs with managed storage, availability zones, autoscaling |
+| **Veritas InfoScale Availability** (formerly VCS) | Enterprise HA cluster with MQ agent, active/passive, supports shared and replicated storage |
 
 ---
 
-## Container / Orchestration Options
 
-| Solution | Notes |
-|---|---|
-| **IBM MQ on OpenShift / Kubernetes** | Native HA or RDQM in containers, persistent volumes, pod rescheduling |
-| **IBM MQ Appliance HA pair** | Hardware appliance, not x86 VMs — included for completeness |
-
----
-
-## Less Common but Valid Options
-
-| Solution | Notes |
-|---|---|
-| **IBM MQ + Keepalived/VRRP** | VIP failover only, no data replication — very limited, not recommended |
-| **Stretch cluster (GFS2 across sites)** | Multi-site active/active filesystem, DLM latency constraints apply |
-| **IBM Spectrum Scale (GPFS)** | Enterprise shared filesystem, replaces NFS for multi-instance QM, strong performance |
-
----
-
-## Summary Comparison Matrix
+### Summary Comparison Matrix
 
 | Solution | Shared Storage | Replication | Nodes | RPO | RTO | Complexity |
 |---|---|---|---|---|---|---|
 | Multi-instance QM | Yes (NFS/GPFS/GFS2) | No | 2 | Near zero | Seconds–minutes | Low |
 | Native HA | No | Yes (Raft) | 3 | Near zero | Seconds | Low |
 | RDQM | No | Yes (DRBD) | 3 | Near zero | Seconds | Medium |
-| Pacemaker + DRBD | No | Yes (DRBD) | 2 + qdevice | Near zero | Seconds | Medium |
-| VMware HA | Depends | No | 2+ hosts | Minutes | Minutes | Low (hypervisor) |
-| VMware FT | Yes | Yes (lockstep) | 2 hosts | Zero | Zero | High |
-| Hyperscaler | Managed | Managed | Varies | Varies | Varies | Low–Medium |
-| MQ on OpenShift | PV | Optional | 3+ | Near zero | Seconds | High |
+| Pacemaker + shared storage | Yes (GFS2/SAN) | No | 2+ | Near zero | Seconds | Medium |
+| VMware HA | Depends | No | 2+ hosts | Minutes (VM restart) | Minutes | Low (hypervisor) |
+| Veritas InfoScale Availability | Yes (VxFS/SAN) | Optional (VVR) | 2+ | Near zero | Seconds | Medium–High |
+
+## Multi-Instance Queue Manager
+
+### Overview
+
+A multi-instance queue manager runs as an active instance on one node and a standby instance on a second node. Both instances share the same queue manager data and logs via a shared filesystem. When the active instance fails, the standby automatically takes over.
+
+### Architecture
+
+```
+Node A (active)                Node B (standby)
+  mqm process running            mqm process waiting
+        \                              /
+         \                            /
+          +----------------------------+
+          |   Shared Filesystem        |
+          |   (NFS / GPFS / GFS2)      |
+          |   - queue manager data     |
+          |   - transaction logs       |
+          +----------------------------+
+```
+
+### Requirements
+
+- Shared filesystem accessible from both nodes simultaneously with full POSIX locking support.
+- Supported shared filesystems:
+  - NFS v4 with locking enabled
+  - GPFS (IBM Spectrum Scale)
+  - GFS2
+  - plain NFS v3 is not sufficient
+- Both nodes must run the same MQ version and fix pack level.
+- Shared filesystem must be mounted on both nodes before starting either instance.
+
+### Failover Behaviour
+
+- Standby polls the shared lock file at a configurable interval (default 30 seconds).
+- On active failure, standby detects the released lock and promotes itself.
+- MQ clients with reconnect enabled reconnect automatically after failover.
+- Failover time is typically 30–90 seconds depending on polling interval and log replay.
+
+### Strengths
+
+- Simple to configure — no third-party cluster software required.
+- Supported on all IBM MQ editions.
+- Automatic failover with no manual intervention needed.
+- Works with existing NFS infrastructure.
+
+### Weaknesses
+
+- Shared filesystem is a single point of failure unless the filesystem itself is HA (GPFS/GFS2).
+- No replication — if the shared storage fails, both nodes are affected.
+- Failover time is longer than Native HA or RDQM due to polling interval.
+- Only 2 nodes supported (1 active + 1 standby).
+
