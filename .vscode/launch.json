@@ -6,7 +6,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/bin/diserr",
-            "args": ["-m", "PYD1"],
+            "args": ["-m", "PYD1", "-f", "json"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],

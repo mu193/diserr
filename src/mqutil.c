@@ -468,7 +468,7 @@ int mqInquireErrorLog (mqconn_t *conn)
                     memcpy (line, value, (size_t) strLen);
                     line[strLen] = '\0';
 
-                    if (osutilMqrcTextToJson (line, &json) != 0)
+                    if (amq2json (line, &json) != 0)
                     {
                       fprintf (stderr, "Error: failed to convert output to JSON\n");
                       free (line);

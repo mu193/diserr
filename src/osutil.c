@@ -3,7 +3,7 @@
    This module provides helpers for process and pipe orchestration.
 
    Functions:
-     osutilMqrcTextToJson - Run mqrc and convert text input to JSON output
+     amq2json - Run mqrc and convert text input to JSON output
 */
 
 /******************************************************************************/
@@ -27,7 +27,7 @@
 /******************************************************************************/
 /* Run mqrc, write text into stdin, read JSON from stdout into heap buffer.   */
 /******************************************************************************/
-int osutilMqrcTextToJson (const char *text, char **json)
+int amq2json (const char *text, char **json)
 {
   int inPipe[2];
   int outPipe[2];

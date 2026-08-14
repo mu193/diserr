@@ -59,7 +59,7 @@ void cmdlUsage (const char *progname)
   printf ("Usage: %s [OPTIONS]\n", progname);
   printf ("\nOptions:\n");
   printf ("  -m, --qmgr        <name>   Connect in binding mode to this queue manager\n");
-  printf ("  -c, --qmgr        <name>   Connect in client mode to this queue manager\n");
+  printf ("  -c, --client      <name>   Connect in client mode to this queue manager\n");
   printf ("  -r, --remQmgr     <name>   Execute PCF on this remote queue manager\n");
   printf ("  -l, --logFile     <name>   Error log file name (e.g. AMQERR01)\n");
   printf ("  -t, --timeStamp   <iso>    Show entries after this ISO 8601 timeStamp\n");
@@ -232,7 +232,7 @@ int cmdlParse (int argc, char *argv[])
 
   static struct option long_options[] = {
     {"qmgr",       required_argument, 0, 'm'},
-    {"qmgr",       required_argument, 0, 'c'},
+    {"client",     required_argument, 0, 'c'},
     {"remQmgr",     required_argument, 0, 'r'},
     {"logFile",     required_argument, 0, 'l'},
     {"timeStamp",   required_argument, 0, 't'},
@@ -358,11 +358,8 @@ int cmdlParse (int argc, char *argv[])
       // -------------------------------------------------------
       // Help (-h) / usage
       // -------------------------------------------------------
-      case 'h':
-        cmdlUsage (argv[0]);
-        return 1;
-
       case '?':
+      case 'h':
         cmdlUsage (argv[0]);
         goto _door_error;
 

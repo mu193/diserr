@@ -3,7 +3,7 @@
    This header defines helper entry points for process and pipe utilities.
 
    Functions:
-     osutilMqrcTextToJson - Run mqrc and convert text input to JSON output
+     amq2json - Run mqrc and convert text input to JSON output
 */
 
 #ifndef OSUTIL_H
@@ -12,6 +12,6 @@
 /******************************************************************************/
 /*                            P R O T O T Y P E S                             */
 /******************************************************************************/
-int osutilMqrcTextToJson (const char *text, char **json);
+int amq2json (const char *text, char **json);
 
 #endif /* OSUTIL_H */
