@@ -435,7 +435,7 @@ int mqInquireErrorLog (mqconn_t *conn)
         {
           MQCHAR value[MQ_1MB_BUF_LEN];
           MQLONG strLen;
-          mqInquireString (itemBag, selector, 0,
+          mqInquireString (itemBag, MQSEL_ALL_SELECTORS, i,
                            sizeof (value), value, &strLen,
                            NULL, &cc, &rc);
           switch (rc)
@@ -445,8 +445,7 @@ int mqInquireErrorLog (mqconn_t *conn)
               const char *sname = mqselector2str ((int) selector);
               if (args.verbose)
                 printf ("  [%s] %.*s\n", sname, (int) strLen, value);
-              else if (selector == MQCACF_ERROR_LOG_RECORD ||
-                       selector == MQCACF_ERROR_LOG_ISOTIME)
+              else if (selector == MQCACF_ERROR_LOG_RECORD)
               {
                 switch (args.format)
                 {
@@ -456,27 +455,14 @@ int mqInquireErrorLog (mqconn_t *conn)
 
                   case FMT_JSON:
                   {
-                    char *line = malloc ((size_t) strLen + 1);
                     char *json = NULL;
-                    if (line == NULL)
-                    {
-                      fprintf (stderr, "Error: Memory allocation failed\n");
-                      sysRc = 1;
-                      goto _cleanup;
-                    }
-
-                    memcpy (line, value, (size_t) strLen);
-                    line[strLen] = '\0';
-
-                    if (amq2json (line, &json) != 0)
+                    value[strLen] = '\0';
+                    if (amq2json (value, &json) != 0)
                     {
                       fprintf (stderr, "Error: failed to convert output to JSON\n");
-                      free (line);
                       sysRc = 1;
                       goto _cleanup;
                     }
-
-                    free (line);
                     if (json != NULL)
                     {
                       fputs (json, stdout);
@@ -492,6 +478,11 @@ int mqInquireErrorLog (mqconn_t *conn)
                     sysRc = 1;
                     goto _cleanup;
                 }
+              }
+              else if (selector == MQCACF_ERROR_LOG_ISOTIME &&
+                       args.format == FMT_TEXT)
+              {
+                printf ("%.*s\n", (int) strLen, value);
               }
               break;
             }
@@ -516,7 +507,7 @@ int mqInquireErrorLog (mqconn_t *conn)
         case MQIT_INTEGER:
         {
           MQLONG value;
-          mqInquireInteger (itemBag, selector, 0,
+          mqInquireInteger (itemBag, MQSEL_ALL_SELECTORS, i,
                             &value, &cc, &rc);
           switch (rc)
           {
@@ -544,6 +535,7 @@ int mqInquireErrorLog (mqconn_t *conn)
           break;
       }
     }
+
   }
 
   _cleanup:

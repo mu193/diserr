@@ -88,24 +88,32 @@ int amq2json (const char *text, char **json)
   close (inPipe[0]);
   close (outPipe[1]);
 
+  // Fork a writer child to avoid deadlock: if mqrc's output fills its pipe
+  // buffer it blocks, which stops it reading stdin, which blocks the write.
+  pid_t wpid = fork ();
+  if (wpid < 0)
+  {
+    close (inPipe[1]);
+    close (outPipe[0]);
+    waitpid (pid, NULL, 0);
+    return -1;
+  }
+  if (wpid == 0)
   {
     size_t len = strlen (text);
     size_t off = 0;
     while (off < len)
     {
-      n = write (inPipe[1], text + off, len - off);
-      if (n < 0)
+      ssize_t nw = write (inPipe[1], text + off, len - off);
+      if (nw < 0)
       {
-        if (errno == EINTR)
-          continue;
-        close (inPipe[1]);
-        close (outPipe[0]);
-        waitpid (pid, NULL, 0);
-        free (buf);
-        return -1;
+        if (errno == EINTR) continue;
+        break;
       }
-      off += (size_t) n;
+      off += (size_t) nw;
     }
+    close (inPipe[1]);
+    _exit (0);
   }
   close (inPipe[1]);
 
@@ -147,6 +155,7 @@ int amq2json (const char *text, char **json)
   }
   close (outPipe[0]);
 
+  waitpid (wpid, NULL, 0);
   if (waitpid (pid, &status, 0) < 0)
   {
     free (buf);
