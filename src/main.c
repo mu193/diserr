@@ -8,11 +8,14 @@
      diserr [OPTIONS]
 
    Options:
-     -m, --qmgr      <name>  Queue manager name (default: default queue manager)
-     -r, --remQmgr   <name>  Execute PCF on this remote queue manager
-     -l, --logFile   <name>  Error log file name (e.g. AMQERR01)
-     -t, --timeStamp <iso>   Show entries after ISO timestamp
-     -h, --help              Display this help message
+     -m, --qmgr        <name>  Connect in binding mode to this queue manager
+     -c, --client      <name>  Connect in client mode to this queue manager
+     -r, --remQmgr     <name>  Execute PCF on this remote queue manager
+     -l, --logFile     <name>  Error log file name (e.g. AMQERR01)
+     -t, --timeStamp   <iso>   Show entries after ISO 8601 timestamp
+     -f, --format      <fmt>   Output format: text (default) or json
+     -v, --verbose             Print all PCF selectors (default: log records only)
+     -h, --help                Display this help message
 */
 
 #include <stdio.h>
@@ -25,6 +28,10 @@ int main (int argc, char *argv[])
   mqconn_t conn;
   int rc;
 
+  /**************************************************************************/
+  /*                         I N I T I A L I Z A T I O N                    */
+  /**************************************************************************/
+
   // -------------------------------------------------------
   // Initialize command line arguments.  
   // -------------------------------------------------------
@@ -36,11 +43,11 @@ int main (int argc, char *argv[])
   rc = cmdlParse (argc, argv);
   switch (rc)
   {
-    case 0:          // Success - continue.  
-      break;         //
-    case 1:          // Help requested - exit cleanly.  
-      goto _door_ok; //
-    case -1:         // Parse error - exit with failure.  
+    case 0:            // Success - continue.  
+      break;           //
+    case 1:            // Help requested - exit cleanly.  
+      goto _door_ok;   //
+    case -1:           // Parse error - exit with failure.  
       goto _door_error;
   }
 
@@ -59,8 +66,12 @@ int main (int argc, char *argv[])
     goto _door_error;
   }
 
+  /**************************************************************************/
+  /*                            R E A L   W O R K                           */
+  /**************************************************************************/
+
   // -------------------------------------------------------
-  // Inquire error log.  
+  // Inquire error log.    
   // -------------------------------------------------------
   rc = mqInquireErrorLog (&conn);
   switch (rc)
@@ -70,6 +81,10 @@ int main (int argc, char *argv[])
     default:          // Error - exit with failure.  
       goto _door_error;
   }
+
+  /**************************************************************************/
+  /*                          H O U S E K E E P I N G                       */
+  /**************************************************************************/
 
   // -------------------------------------------------------
   // Disconnect from queue manager.  

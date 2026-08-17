@@ -266,8 +266,9 @@ int mqInquireErrorLog (mqconn_t *conn)
 
   // -------------------------------------------------------
   // Add optional request parameters to command bag.
+  // set MQCACF_ERROR_LOG_NAME if -l / --logFile was specified
   // -------------------------------------------------------
-  if (strlen (logName) > 0)
+  if (strlen (logName) > 0)     
   {
     mqAddString (cmdBag, MQCACF_ERROR_LOG_NAME,
                  MQBL_NULL_TERMINATED, (MQCHAR *) logName,
@@ -284,6 +285,10 @@ int mqInquireErrorLog (mqconn_t *conn)
     }
   }
 
+  // -------------------------------------------------------
+  // Add optional request parameters to command bag.
+  // set MQCACF_ERROR_LOG_AFTER_ISOTIME if -t / --timeStamp was specified
+  // -------------------------------------------------------
   if (strlen (afterIsoTime) > 0)
   {
     mqAddString (cmdBag, MQCACF_ERROR_LOG_AFTER_ISOTIME,
@@ -304,7 +309,10 @@ int mqInquireErrorLog (mqconn_t *conn)
   // -------------------------------------------------------
   // Create response bag. 
   // -------------------------------------------------------
-  mqCreateBag (MQCBO_ADMIN_BAG, &repBag, &cc, &rc);
+  mqCreateBag( MQCBO_ADMIN_BAG, 
+               &repBag        ,  // Output: response bag handle
+               &cc            , 
+               &rc           );
   switch (rc)
   {
     case MQRC_NONE:
@@ -326,33 +334,38 @@ int mqInquireErrorLog (mqconn_t *conn)
   // -------------------------------------------------------
   MQHOBJ hAdminQ = MQHO_NONE;
 
-  if (mqOpenQueue (conn, MQ_ADMIN_COMMAND_QUEUE, args.remQmgr,
-                   MQOO_OUTPUT, &hAdminQ) != MQRC_NONE)
+  if (mqOpenQueue( conn                  ,
+                   MQ_ADMIN_COMMAND_QUEUE, 
+                   args.remQmgr          ,
+                   MQOO_OUTPUT           , 
+                   &hAdminQ              ) != MQRC_NONE )
   {
     sysRc = 1;
     goto _cleanup;
   }
 
   // -------------------------------------------------------
-  // Execute PCF: MQCMD_INQUIRE_ERROR_LOG command.  
+  // Exec PCF MQCMD_INQUIRE_ERROR_LOG: send cmdBag to the
+  // command server via hAdminQ; repBag content is replaced
+  // with the PCF response on a temporary dynamic queue.
   // -------------------------------------------------------
-  mqExecute (conn->hConn,
+  mqExecute( conn->hConn            ,
              MQCMD_INQUIRE_ERROR_LOG,
-             MQHB_NONE,
-             cmdBag,
-             repBag,
-             hAdminQ,
-             MQHO_NONE,
-             &cc, &rc);
+             MQHB_NONE              ,
+             cmdBag                 ,
+             repBag                 ,
+             hAdminQ                ,
+             MQHO_NONE              ,
+             &cc                    ,
+             &rc                   );
 
   switch (rc)
   {
     case MQRC_NONE:
       break;
 
-    default:            // Extract actual reason from the response bag.
-    {
-      // Save the mqExecute return codes before bag operations overwrite them.
+    default:  // Extract actual reason from the response bag.
+    {         // Save the mqExecute return codes before bag operations overwrite them.
       MQLONG execCC = cc;
       MQLONG execRC = rc;
 
@@ -365,16 +378,24 @@ int mqInquireErrorLog (mqconn_t *conn)
       // This only works when mqExecute got a reply back (command server
       // error); it does NOT work for transport-level failures where the
       // response bag was never populated.
-      mqInquireBag     (repBag,    MQHA_BAG_HANDLE,   0,          &errorBag, &bagCC, &bagRC);
+      mqInquireBag ( repBag         ,
+                     MQHA_BAG_HANDLE,
+                     0              ,
+                     &errorBag      , 
+                     &bagCC         , 
+                     &bagRC        );
       if (bagRC == MQRC_NONE)
       {
-        mqInquireInteger (errorBag, MQIASY_COMP_CODE,  MQIND_NONE, &cmdSrvCC, &bagCC, &bagRC);
-        mqInquireInteger (errorBag, MQIASY_REASON,     MQIND_NONE, &cmdSrvRC, &bagCC, &bagRC);
+        mqInquireInteger (errorBag, MQIASY_COMP_CODE, MQIND_NONE, &cmdSrvCC, &bagCC, &bagRC);
+        mqInquireInteger (errorBag, MQIASY_REASON,    MQIND_NONE, &cmdSrvRC, &bagCC, &bagRC);
       }
 
       switch (cmdSrvRC)
       {
-        case MQRCCF_NONE_FOUND:           // No entries match the criteria - not an error.
+        // -------------------------------------------------
+        // No entries match the criteria - not an error.
+        // -------------------------------------------------
+        case MQRCCF_NONE_FOUND: 
           printf ("No error log entries found for the given criteria.\n");
           sysRc = 0;
           break;
@@ -394,7 +415,7 @@ int mqInquireErrorLog (mqconn_t *conn)
   //   Each embedded bag holds one PCF response message.  
   // -------------------------------------------------------
   MQLONG bagCount;
-  mqCountItems (repBag, MQHA_BAG_HANDLE, &bagCount, &cc, &rc);
+  mqCountItems( repBag, MQHA_BAG_HANDLE, &bagCount, &cc, &rc );
   switch (rc)
   {
     case MQRC_NONE:
@@ -412,7 +433,12 @@ int mqInquireErrorLog (mqconn_t *conn)
   for (MQLONG b = 0; b < bagCount; b++)
   {
     MQHBAG itemBag;
-    mqInquireBag (repBag, MQHA_BAG_HANDLE, b, &itemBag, &cc, &rc);
+    mqInquireBag( repBag         , 
+                  MQHA_BAG_HANDLE,
+                  b              ,
+                  &itemBag       ,  // output: embedded bag for one PCF response message
+                  &cc            , 
+                  &rc           );
     if (rc != MQRC_NONE) break;
 
     MQLONG paramCount;
@@ -421,9 +447,16 @@ int mqInquireErrorLog (mqconn_t *conn)
 
     for (MQLONG i = 0; i < paramCount; i++)
     {
-      MQLONG selector, itemType;
-      mqInquireItemInfo (itemBag, MQSEL_ALL_SELECTORS, i,
-                         &selector, &itemType, &cc, &rc);
+      MQLONG selector; 
+      MQLONG itemType;
+      mqInquireItemInfo( itemBag            ,  // Bag handle
+                         MQSEL_ALL_SELECTORS, 
+                         i                  ,
+                         &selector          ,  // Output: selector of item
+                         &itemType          ,  // Output: data type of item 
+                         &cc                ,
+                         &rc               );
+
       if (rc != MQRC_NONE) break;
 
       switch (itemType)
@@ -435,7 +468,8 @@ int mqInquireErrorLog (mqconn_t *conn)
         {
           MQCHAR value[MQ_1MB_BUF_LEN];
           MQLONG strLen;
-          mqInquireString (itemBag, MQSEL_ALL_SELECTORS, i,
+          mqInquireString( itemBag      ,
+                           MQSEL_ALL_SELECTORS, i,
                            sizeof (value), value, &strLen,
                            NULL, &cc, &rc);
           switch (rc)

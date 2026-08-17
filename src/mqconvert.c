@@ -1,4 +1,12 @@
-/* mqconvert.c - IBM MQ constant to string conversion functions. */
+/* mqconvert.c - IBM MQ constant-to-string conversion functions.
+
+   This module maps IBM MQ integer constants to their symbolic names
+   for use in diagnostic output and error reporting.
+
+   Functions:
+     mqselector2str  - Convert PCF selector integer to symbolic name string
+     mqcft2str       - Convert PCF command/response type integer to symbolic name string
+*/
 
 #include <stddef.h>
 #include <stdio.h>
