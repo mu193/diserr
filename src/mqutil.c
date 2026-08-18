@@ -434,142 +434,92 @@ int mqInquireErrorLog (mqconn_t *conn)
   {
     MQHBAG itemBag;
     mqInquireBag( repBag         , 
-                  MQHA_BAG_HANDLE,
+                  MQHA_BAG_HANDLE, 
                   b              ,
                   &itemBag       ,  // output: embedded bag for one PCF response message
                   &cc            , 
                   &rc           );
     if (rc != MQRC_NONE) break;
 
-    MQLONG paramCount;
-    mqCountItems (itemBag, MQSEL_ALL_SELECTORS, &paramCount, &cc, &rc);
-    if (rc != MQRC_NONE) break;
-
-    for (MQLONG i = 0; i < paramCount; i++)
+    // -------------------------------------------------
+    // Read and output the error log record.
+    // -------------------------------------------------
+    MQCHAR record[MQ_1MB_BUF_LEN];
+    MQLONG recLen;
+    mqInquireString( itemBag                ,
+                     MQCACF_ERROR_LOG_RECORD, 
+                     MQIND_NONE             ,
+                     sizeof (record)        , 
+                     record                 ,
+                     &recLen                ,
+                     NULL                   ,
+                     &cc                    ,
+                     &rc                   );
+    if (rc != MQRC_NONE)
     {
-      MQLONG selector; 
-      MQLONG itemType;
-      mqInquireItemInfo( itemBag            ,  // Bag handle
-                         MQSEL_ALL_SELECTORS, 
-                         i                  ,
-                         &selector          ,  // Output: selector of item
-                         &itemType          ,  // Output: data type of item 
-                         &cc                ,
-                         &rc               );
-
-      if (rc != MQRC_NONE) break;
-
-      switch (itemType)
-      {
-        // -------------------------------------------------
-        // Handle STRING item types.
-        // -------------------------------------------------
-        case MQIT_STRING:
-        {
-          MQCHAR value[MQ_1MB_BUF_LEN];
-          MQLONG strLen;
-          mqInquireString( itemBag      ,
-                           MQSEL_ALL_SELECTORS, i,
-                           sizeof (value), value, &strLen,
-                           NULL, &cc, &rc);
-          switch (rc)
-          {
-            case MQRC_NONE:
-            {
-              const char *sname = mqselector2str ((int) selector);
-              if (args.verbose)
-                printf ("  [%s] %.*s\n", sname, (int) strLen, value);
-              else if (selector == MQCACF_ERROR_LOG_RECORD)
-              {
-                switch (args.format)
-                {
-                  case FMT_TEXT:
-                    printf ("%.*s\n", (int) strLen, value);
-                    break;
-
-                  case FMT_JSON:
-                  {
-                    char *json = NULL;
-                    value[strLen] = '\0';
-                    if (amq2json (value, &json) != 0)
-                    {
-                      fprintf (stderr, "Error: failed to convert output to JSON\n");
-                      sysRc = 1;
-                      goto _cleanup;
-                    }
-                    if (json != NULL)
-                    {
-                      fputs (json, stdout);
-                      if (json[0] != '\0' && json[strlen (json) - 1] != '\n')
-                        fputc ('\n', stdout);
-                      free (json);
-                    }
-                    break;
-                  }
-
-                  default:
-                    fprintf (stderr, "Error: unsupported output format\n");
-                    sysRc = 1;
-                    goto _cleanup;
-                }
-              }
-              else if (selector == MQCACF_ERROR_LOG_ISOTIME &&
-                       args.format == FMT_TEXT)
-              {
-                printf ("%.*s\n", (int) strLen, value);
-              }
-              break;
-            }
-            case MQRC_STRING_TRUNCATED:
-              fprintf (stderr, "  Warning: selector %d string truncated"
-                               " (%d bytes returned)\n",
-                       (int) selector, (int) sizeof (value));
-              printf ("  [%d] %.*s\n", (int) selector,
-                      (int) sizeof (value), value);
-              break;
-            default:
-              fprintf (stderr, "  mqInquireString selector %d failed: %d %s\n",
-                       (int) selector, (int) rc, mqrc2str (rc));
-              break;
-          }
-          break;
-        }
-
-        // -------------------------------------------------
-        // Handle INTEGER item types.
-        // -------------------------------------------------
-        case MQIT_INTEGER:
-        {
-          MQLONG value;
-          mqInquireInteger (itemBag, MQSEL_ALL_SELECTORS, i,
-                            &value, &cc, &rc);
-          switch (rc)
-          {
-            case MQRC_NONE:
-            {
-              const char *sname = mqselector2str ((int) selector);
-              if (args.verbose)
-                printf ("  [%s] %d\n", sname, (int) value);
-              break;
-            }
-            default:
-              fprintf (stderr, "  mqInquireInteger selector %d failed: %d %s\n",
-                       (int) selector, (int) rc, mqrc2str (rc));
-              break;
-          }
-          break;
-        }
-
-        // -------------------------------------------------
-        // Any other item types are unexpected for this command.
-        // -------------------------------------------------
-        default:
-          fprintf (stderr, "Warning: unexpected item type %d for selector %d\n",
-                   (int) itemType, (int) selector);
-          break;
-      }
+      fprintf (stderr, "mqInquireString MQCACF_ERROR_LOG_RECORD failed: %d %s\n",
+               (int) rc, mqrc2str (rc));
+      break;
     }
 
+    // -------------------------------------------------
+    // Read ISO timestamp (printed last if --print-time).
+    // -------------------------------------------------
+    MQCHAR isotime[64];
+    MQLONG timeLen;
+    mqInquireString( itemBag                 ,
+                     MQCACF_ERROR_LOG_ISOTIME,
+                     MQIND_NONE              ,
+                     sizeof (isotime)        ,
+                     isotime                 ,
+                     &timeLen                ,
+                     NULL                    ,
+                     &cc                     ,
+                     &rc                    );
+
+    switch (args.format)
+    {
+      // ---------------------------------------------------
+      // Output format: text 
+      // ---------------------------------------------------
+      case FMT_TEXT:
+        printf ("%.*s\n", (int) recLen, record);
+        break;
+
+      // ---------------------------------------------------
+      // Output format: json
+      // ---------------------------------------------------
+      case FMT_JSON:
+      {
+        char *json = NULL;
+        record[recLen] = '\0';
+        if (amq2json (record, &json) != 0)
+        {
+          fprintf (stderr, "Error: failed to convert output to JSON\n");
+          sysRc = 1;
+          goto _cleanup;
+        }
+        if (json != NULL)
+        {
+          fputs (json, stdout);
+          if (json[0] != '\0' && json[strlen (json) - 1] != '\n')
+            fputc ('\n', stdout);
+          free (json);
+        }
+        break;
+      }
+
+      default:
+        fprintf (stderr, "Error: unsupported output format\n");
+        sysRc = 1;
+        goto _cleanup;
+    }
+
+    // -----------------------------------------------------
+    // Print timestamp oft the last log entry if requested.
+    // -----------------------------------------------------
+    if (args.printTime && rc == MQRC_NONE)
+      printf ("%.*s\n", (int) timeLen, isotime);
   }
 
   _cleanup:

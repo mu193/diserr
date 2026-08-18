@@ -51,6 +51,7 @@ void cmdlInit (void)
   args.remQmgr   = NULL;      // remote qmgr name for PCF execution (-r)
   args.verbose   = 0;         // print all selectors (-v)
   args.format    = FMT_TEXT;  // output format: text or json (-f)
+  args.printTime = 0;         // print timestamp with each entry (--print-time)
 }
 
 /******************************************************************************/
@@ -70,6 +71,7 @@ int cmdlParse (int argc, char *argv[])
     {"format",      required_argument, 0, 'f'},
     {"help",        no_argument,       0, 'h'},
     {"verbose",     no_argument,       0, 'v'},
+    {"print-time",  no_argument,       0, 1001},
     {0, 0, 0, 0}
   };
 
@@ -186,6 +188,10 @@ int cmdlParse (int argc, char *argv[])
         args.verbose = 1;
         break;
 
+      case 1001:
+        args.printTime = 1;
+        break;
+
       // -------------------------------------------------------
       // Help (-h) / usage
       // -------------------------------------------------------
@@ -220,6 +226,7 @@ void cmdlUsage (const char *progname)
   printf ("  -t, --timeStamp   <iso>    Show entries after this ISO 8601 timeStamp\n");
   printf ("  -f, --format      <fmt>    Output format: text (default) or json\n");
   printf ("  -v, --verbose              Print all PCF selectors (default: log records only)\n");
+  printf ("      --print-time           Print timestamp with each log entry\n");
   printf ("  -h, --help                 Display this help message\n");
   printf ("\nNote: -m and -c are mutually exclusive.\n");
   printf ("\nTimestamp format (-t):\n");
