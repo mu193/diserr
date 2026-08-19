@@ -3,3 +3,4 @@ obj/*
 tmp/*
 inc/mqreason.h
 src/mqreason.c
+src/version.c

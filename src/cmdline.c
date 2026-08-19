@@ -52,6 +52,7 @@ void cmdlInit (void)
   args.verbose   = 0;         // print all selectors (-v)
   args.format    = FMT_TEXT;  // output format: text or json (-f)
   args.printTime = 0;         // print timestamp with each entry (--print-time)
+  args.version   = 0;         // print version information (--version)
 }
 
 /******************************************************************************/
@@ -60,6 +61,7 @@ void cmdlInit (void)
 int cmdlParse (int argc, char *argv[])
 {
   int opt;
+  int arg_index;
   int option_index = 0;
 
   static struct option long_options[] = {
@@ -72,8 +74,18 @@ int cmdlParse (int argc, char *argv[])
     {"help",        no_argument,       0, 'h'},
     {"verbose",     no_argument,       0, 'v'},
     {"print-time",  no_argument,       0, 1001},
+    {"version",     no_argument,       0, 1002},
     {0, 0, 0, 0}
   };
+
+  for (arg_index = 1; arg_index < argc; arg_index++)
+  {
+    if (strcmp (argv[arg_index], "--version") == 0 && argc != 2)
+    {
+      fprintf (stderr, "Error: --version cannot be combined with other arguments\n");
+      return -1;
+    }
+  }
 
   while ((opt = getopt_long (argc, argv, "m:c:r:l:t:f:hv",
                              long_options, &option_index)) != -1)
@@ -192,24 +204,40 @@ int cmdlParse (int argc, char *argv[])
         args.printTime = 1;
         break;
 
+      case 1002:
+        args.version = 1;
+        break;
+
       // -------------------------------------------------------
       // Help (-h) / usage
       // -------------------------------------------------------
       case '?':
+        goto _door_error;
+
       case 'h':
         cmdlUsage (argv[0]);
-        goto _door_error;
+        return 1;
 
       default:
         goto _door_error;
     }
   }
 
+  if (args.version)
+  {
+    if (argc != 2 || strcmp (argv[1], "--version") != 0)
+    {
+      fprintf (stderr, "Error: --version cannot be combined with other arguments\n");
+      goto _door_error;
+    }
+    return 2;
+  }
+
 //_door_ok:
   return 0;
 
   _door_error:
-    return 1;
+    return -1;
 }
 
 /******************************************************************************/
@@ -227,6 +255,7 @@ void cmdlUsage (const char *progname)
   printf ("  -f, --format      <fmt>    Output format: text (default) or json\n");
   printf ("  -v, --verbose              Print all PCF selectors (default: log records only)\n");
   printf ("      --print-time           Print timestamp with each log entry\n");
+  printf ("      --version              Print version information\n");
   printf ("  -h, --help                 Display this help message\n");
   printf ("\nNote: -m and -c are mutually exclusive.\n");
   printf ("\nTimestamp format (-t):\n");

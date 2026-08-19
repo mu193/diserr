@@ -13,8 +13,15 @@
 # Compiler and flags
 # ----------------------------------------------------------
 CC = gcc
-DEBUG = -g
-CFLAGS = -Wall -Wextra -std=c11 -I$(INC_DIR) -I/opt/mqm/inc $(DEBUG) -MMD -MP
+
+BUILD ?= debug
+ifeq ($(BUILD),release)
+  CFLAGS_BUILD = -O2
+else
+  CFLAGS_BUILD = -g -O0
+endif
+
+CFLAGS = -Wall -Wextra -std=c11 -I$(INC_DIR) -I/opt/mqm/inc $(CFLAGS_BUILD) -MMD -MP
 LDFLAGS = -L/opt/mqm/lib64 -lmqm -lmqmzf -Wl,-rpath,/opt/mqm/lib64 
 
 PERL = perl
@@ -37,7 +44,7 @@ TARGET = $(BIN_DIR)diserr
 # ----------------------------------------------------------
 # Source and object files
 # ----------------------------------------------------------
-SRC_FILES = main.c cmdline.c mqutil.c mqreason.c mqconvert.c osutil.c
+SRC_FILES = main.c cmdline.c mqutil.c mqreason.c mqconvert.c osutil.c version.c
 
 SOURCES = $(addprefix $(SRC_DIR), $(SRC_FILES))
 OBJECTS = $(addprefix $(OBJ_DIR), $(SRC_FILES:.c=.o))
@@ -122,6 +129,16 @@ $(SRC_DIR)mqreason.c: $(ETC_DIR)mqreason.sc $(TMP_DIR)mqreason.c.0 $(ETC_DIR)mqr
 	cat $^ > $@
 
 # ----------------------------------------------------------
+# create a version source file with the latest git commit timestamp and build type
+# ----------------------------------------------------------
+$(SRC_DIR)version.c: $(ETC_DIR)version.sc $(ETC_DIR)version.ec $(INC_DIR)version.h | $(SRC_DIR)
+	@ cp $< $@
+	@ echo "#define VER_CMT  \"$(shell git log -n 1 --format=%cI)\"" >> $@
+	@ echo "#define VER_TYPE \"$(BUILD)\""                           >> $@
+	@ echo "#define VER_DATE \"$(shell date -u +%Y-%m-%dT%H:%M:%SZ)\"" >> $@
+	@ cat $(word 2,$^) >> $@
+
+# ----------------------------------------------------------
 # Auto-generated header dependencies (produced by -MMD -MP)
 # ----------------------------------------------------------
 -include $(DEPS)
@@ -131,9 +148,26 @@ $(SRC_DIR)mqreason.c: $(ETC_DIR)mqreason.sc $(TMP_DIR)mqreason.c.0 $(ETC_DIR)mqr
 # ----------------------------------------------------------
 clean:
 	rm -rf $(OBJ_DIR) $(BIN_DIR) $(TMP_DIR)
-	rm -f $(SRC_DIR)mqreason.c $(INC_DIR)mqreason.h
+	rm -f $(SRC_DIR)mqreason.c $(SRC_DIR)version.c $(INC_DIR)mqreason.h
 
 # ----------------------------------------------------------
 # Phony targets
 # ----------------------------------------------------------
-.PHONY: all clean
+.PHONY: all clean help
+
+help:
+	@echo "Usage: make [BUILD=debug|release] [target]"
+	@echo ""
+	@echo "Targets:"
+	@echo "  all            Build the diserr executable (default)"
+	@echo "  clean          Remove all build artifacts"
+	@echo "  help           Show this help message"
+	@echo ""
+	@echo "Options:"
+	@echo "  BUILD=debug    Build with -g -O0 (default)"
+	@echo "  BUILD=release  Build with -O2, no debug symbols"
+	@echo ""
+	@echo "Examples:"
+	@echo "  make                   debug build"
+	@echo "  make BUILD=release     release build"
+	@echo "  make clean             remove obj/, bin/, tmp/"

@@ -29,6 +29,7 @@
 
 /******************************************************************************/
 /* Run mqrc, write text into stdin, read JSON from stdout into heap buffer.   */
+/* On success *json points to a heap buffer that the caller must free().      */
 /******************************************************************************/
 int amq2json( const char  *text ,  // input: text to convert (may be NULL)
                     char **json )  // output: pointer to heap buffer with JSON
@@ -198,6 +199,9 @@ int amq2json( const char  *text ,  // input: text to convert (may be NULL)
   }                     // whole stream has been read, 
   close (outPipe[0]);   // close pipe to mqrc's stdout
 
+  // -------------------------------------------------------
+  // Wait for both child processes to finish and check exit status.
+  // -------------------------------------------------------
   waitpid (pidWriter, NULL, 0);
   if (waitpid (pidMqrc, &status, 0) < 0)
   {
@@ -211,6 +215,10 @@ int amq2json( const char  *text ,  // input: text to convert (may be NULL)
     return -1;
   }
 
+  // -------------------------------------------------------
+  // Return the heap buffer with JSON output to the caller.
+  // If buf is NULL, allocate a 1-byte buffer for the empty string. 
+  // -------------------------------------------------------
   if (buf == NULL)
   {
     buf = malloc (1);

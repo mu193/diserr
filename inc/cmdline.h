@@ -51,6 +51,7 @@ typedef struct
   int         verbose;    // verbose output (-v): print all selectors
   formatType_t format;    // output format (-f): text (default) or json
   int         printTime;  // print timestamp with each entry (--print-time)
+  int         version;    // print version information (--version)
 } cmdline_t;
 
 extern cmdline_t args;

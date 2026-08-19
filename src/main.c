@@ -16,12 +16,14 @@
      -f, --format      <fmt>   Output format: text (default) or json
      -v, --verbose             Print all PCF selectors (default: log records only)
      -h, --help                Display this help message
+       --version             Print version information
 */
 
 #include <stdio.h>
 #include <stdlib.h>
 #include "cmdline.h"
 #include "mqutil.h"
+#include "version.h"
 
 int main (int argc, char *argv[])
 {
@@ -47,6 +49,9 @@ int main (int argc, char *argv[])
       break;           //
     case 1:            // Help requested - exit cleanly.  
       goto _door_ok;   //
+    case 2:            // Version requested - exit cleanly.
+      version ();
+      goto _door_ok;
     case -1:           // Parse error - exit with failure.  
       goto _door_error;
   }
