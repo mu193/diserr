@@ -17,6 +17,7 @@ CC = gcc
 BUILD ?= debug
 ifeq ($(BUILD),release)
   CFLAGS_BUILD = -O2
+  MAKEFLAGS += -B
 else
   CFLAGS_BUILD = -g -O0
 endif

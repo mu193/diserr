@@ -184,10 +184,17 @@ int mqOpenQueue ( mqconn_t   *conn   ,  // MQ connection handle and state
   MQOD   od = {MQOD_DEFAULT};  // Object descriptor: queue name and options
   MQLONG cc, rc;               // MQ completion code and reason code
 
-  strncpy (od.ObjectName, qName, MQ_Q_NAME_LENGTH);
+#ifdef __GNUC__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstringop-truncation"
+#endif
 
-  if (rQmgr != NULL && strlen (rQmgr) > 0)
-    strncpy (od.ObjectQMgrName, rQmgr, MQ_Q_MGR_NAME_LENGTH);
+  strncpy (od.ObjectName    , qName, MQ_Q_NAME_LENGTH);
+  strncpy (od.ObjectQMgrName, rQmgr, MQ_Q_MGR_NAME_LENGTH);
+
+#ifdef __GNUC__
+#pragma GCC diagnostic pop
+#endif
 
   MQOPEN (conn->hConn, &od, options, hObj, &cc, &rc);
 

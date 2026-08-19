@@ -14,9 +14,6 @@
 */
 
 #define _GNU_SOURCE             // GNU extensions (timegm) + POSIX.1-2008
-                                //  (getopt_long, strdup)
-
-/******************************************************************************/
 /*                               I N C L U D E S                              */
 /******************************************************************************/
 #include <stdio.h>
@@ -445,9 +442,10 @@ static int cmdlNormalizeIsoTime (const char *ts, char *buf, size_t bufLen)
   }                                           // ---------------
 
   struct tm *utc = gmtime (&t);
-  snprintf (buf, bufLen, "%04d-%02d-%02dT%02d:%02d:%02d.%03dZ",
-            utc->tm_year + 1900, utc->tm_mon + 1, utc->tm_mday,
-            utc->tm_hour, utc->tm_min, utc->tm_sec, ms);
+  if (utc == NULL || bufLen < 25
+      || strftime (buf, bufLen, "%Y-%m-%dT%H:%M:%S", utc) != 19)
+    return -1;
+  snprintf (buf + 19, bufLen - 19, ".%03dZ", ms);
   return 0;
 }
 
