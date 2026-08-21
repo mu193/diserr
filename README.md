@@ -47,4 +47,5 @@ Timestamp format (-t):
 | --- | --- |
 | 1.0.0 | Initial release |
 | 1.0.1 | Core dump remote queue-manager bug fix |
+| 1.0.2 | Reply queue renamed |
 

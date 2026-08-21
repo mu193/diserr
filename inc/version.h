@@ -13,13 +13,14 @@
     VERSIONS:
       1.0.0 - Initial release
       1.0.1 - core dump rqmgr bug fix
+      1.0.2 - reply queue renamed
   
 */
 
 #ifndef VERSION_H
 #define VERSION_H
 
-#define VERSION "1.0.1"
+#define VERSION "1.0.2"
 
 void version(void);
 

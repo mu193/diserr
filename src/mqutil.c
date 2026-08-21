@@ -36,6 +36,7 @@
 /******************************************************************************/
 #define MQ_1MB_BUF_LEN          (1024 * 1024)  /* 1 MB read buffer for PCF string values */
 #define MQ_ADMIN_COMMAND_QUEUE   "SYSTEM.ADMIN.COMMAND.QUEUE"
+#define MQ_DISERR_REPLY          "MONITOR.DISERR.REPLY.*"
 
 /******************************************************************************/
 /*                                                                            */
@@ -343,6 +344,7 @@ int mqInquireErrorLog (mqconn_t *conn)
   // targets the local queue manager.
   // -------------------------------------------------------
   MQHOBJ hAdminQ = MQHO_NONE;
+  MQHOBJ hReplyQ = MQHO_NONE;
 
   if (mqOpenQueue( conn                  ,
                    MQ_ADMIN_COMMAND_QUEUE, 
@@ -352,6 +354,32 @@ int mqInquireErrorLog (mqconn_t *conn)
   {
     sysRc = 1;
     goto _cleanup;
+  }
+
+  // -------------------------------------------------------
+  // Create a dynamic reply queue with the application prefix.
+  // -------------------------------------------------------
+  {
+    MQOD replyOd = {MQOD_DEFAULT};
+
+    strncpy (replyOd.ObjectName, "SYSTEM.DEFAULT.MODEL.QUEUE",
+             MQ_Q_NAME_LENGTH);
+    strncpy (replyOd.DynamicQName, MQ_DISERR_REPLY,
+             MQ_Q_NAME_LENGTH);
+
+    MQOPEN (conn->hConn,
+            &replyOd,
+            MQOO_INPUT_EXCLUSIVE | MQOO_FAIL_IF_QUIESCING,
+            &hReplyQ,
+            &cc,
+            &rc);
+    if (rc != MQRC_NONE)
+    {
+      fprintf (stderr, "MQOPEN reply queue failed: CC=%d RC=%d %s\n",
+               (int) cc, (int) rc, mqrc2str (rc));
+      sysRc = rc;
+      goto _cleanup;
+    }
   }
 
   // -------------------------------------------------------
@@ -365,7 +393,7 @@ int mqInquireErrorLog (mqconn_t *conn)
              cmdBag                 ,
              repBag                 ,
              hAdminQ                ,
-             MQHO_NONE              ,
+             hReplyQ                ,
              &cc                    ,
              &rc                   );
 
@@ -533,6 +561,8 @@ int mqInquireErrorLog (mqconn_t *conn)
   }
 
   _cleanup:
+    if (hReplyQ != MQHO_NONE)
+      MQCLOSE (conn->hConn, &hReplyQ, MQCO_DELETE_PURGE, &cc, &rc);
     if (hAdminQ != MQHO_NONE)          mqCloseQueue  (conn, &hAdminQ);
     if (cmdBag  != MQHB_UNUSABLE_HBAG) mqDeleteBag (&cmdBag, &cc, &rc);
     if (repBag  != MQHB_UNUSABLE_HBAG) mqDeleteBag (&repBag, &cc, &rc);
