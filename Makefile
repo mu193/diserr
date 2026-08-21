@@ -6,12 +6,19 @@
 #   clean - Remove all build artifacts                                         #
 #                                                                              #
 # Dependencies:                                                                #
-#   IBM MQ libraries expected under /opt/mqm                                   #
+#   IBM MQ libraries expected under $(MQINST)                                  #
 ################################################################################
+
+# ----------------------------------------------------------
+# environment configuration
+# ----------------------------------------------------------
+-include config.mk
+MQINST ?= /opt/mqm
 
 # ----------------------------------------------------------
 # Compiler and flags
 # ----------------------------------------------------------
+
 CC = gcc
 
 BUILD ?= debug
@@ -22,8 +29,8 @@ else
   CFLAGS_BUILD = -g -O0
 endif
 
-CFLAGS = -Wall -Wextra -std=c11 -I$(INC_DIR) -I/opt/mqm/inc $(CFLAGS_BUILD) -MMD -MP
-LDFLAGS = -L/opt/mqm/lib64 -lmqm -Wl,-rpath,/opt/mqm/lib64 
+CFLAGS = -Wall -Wextra -std=c11 -I$(INC_DIR) -I$(MQINST)/inc $(CFLAGS_BUILD) -MMD -MP
+LDFLAGS = -L$(MQINST)/lib64 -lmqm -Wl,-rpath,$(MQINST)/lib64
 
 PERL = perl
 AWK  = awk
