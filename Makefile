@@ -23,7 +23,7 @@ else
 endif
 
 CFLAGS = -Wall -Wextra -std=c11 -I$(INC_DIR) -I/opt/mqm/inc $(CFLAGS_BUILD) -MMD -MP
-LDFLAGS = -L/opt/mqm/lib64 -lmqm -lmqmzf -Wl,-rpath,/opt/mqm/lib64 
+LDFLAGS = -L/opt/mqm/lib64 -lmqm -Wl,-rpath,/opt/mqm/lib64 
 
 PERL = perl
 AWK  = awk

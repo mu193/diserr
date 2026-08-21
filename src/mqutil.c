@@ -190,7 +190,10 @@ int mqOpenQueue ( mqconn_t   *conn   ,  // MQ connection handle and state
 #endif
 
   strncpy (od.ObjectName    , qName, MQ_Q_NAME_LENGTH);
-  strncpy (od.ObjectQMgrName, rQmgr, MQ_Q_MGR_NAME_LENGTH);
+  // if remote queue manager is not specified, 
+  // do not change od.ObjectQMgrName -> connect to the local one.
+  if (rQmgr != NULL && strlen (rQmgr) > 0)
+    strncpy (od.ObjectQMgrName, rQmgr, MQ_Q_MGR_NAME_LENGTH);
 
 #ifdef __GNUC__
 #pragma GCC diagnostic pop
