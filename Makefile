@@ -69,7 +69,7 @@ all: $(TARGET)
 # ----------------------------------------------------------
 $(TARGET): $(OBJECTS) | $(BIN_DIR)
 	$(CC) $(OBJECTS) -o $@ $(LDFLAGS)
-	chmod +rx $@
+	$(CHMOD) a+rx $@
 
 # ----------------------------------------------------------
 # Compile source files to object files
