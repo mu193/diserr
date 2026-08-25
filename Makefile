@@ -32,9 +32,10 @@ endif
 CFLAGS = -Wall -Wextra -std=c11 -I$(INC_DIR) -I$(MQINST)/inc $(CFLAGS_BUILD) -MMD -MP
 LDFLAGS = -L$(MQINST)/lib64 -lmqm -Wl,-rpath,$(MQINST)/lib64
 
-PERL = perl
-AWK  = awk
-MQRC = mqrc 
+AWK   = awk
+CHMOD = chmod
+PERL  = perl
+MQRC  = mqrc 
 
 # Directories
 SRC_DIR = src/
@@ -68,6 +69,7 @@ all: $(TARGET)
 # ----------------------------------------------------------
 $(TARGET): $(OBJECTS) | $(BIN_DIR)
 	$(CC) $(OBJECTS) -o $@ $(LDFLAGS)
+	chmod +x $@
 
 # ----------------------------------------------------------
 # Compile source files to object files
