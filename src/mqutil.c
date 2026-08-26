@@ -345,11 +345,15 @@ int mqInquireErrorLog (mqconn_t *conn)
   // -------------------------------------------------------
   MQHOBJ hAdminQ = MQHO_NONE;
   MQHOBJ hReplyQ = MQHO_NONE;
+  MQLONG adminQOptions = MQOO_OUTPUT | MQOO_FAIL_IF_QUIESCING;
+
+  if (args.remQmgr == NULL || strlen (args.remQmgr) == 0)
+    adminQOptions |= MQOO_INQUIRE;
 
   if (mqOpenQueue( conn                  ,
                    MQ_ADMIN_COMMAND_QUEUE, 
                    args.remQmgr          ,
-                   MQOO_OUTPUT | MQOO_INQUIRE | MQOO_FAIL_IF_QUIESCING ,
+                   adminQOptions         ,
                    &hAdminQ              ) != MQRC_NONE )
   {
     sysRc = 1;
