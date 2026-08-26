@@ -67,7 +67,7 @@ int main (int argc, char *argv[])
   if (mqConnect (&conn))
   {
     fprintf ( stderr, "Failed to connect to queue manager: %s\n",
-              args.qmgr);
+              args.qmgr != NULL ? args.qmgr : "(default qmgr)");
     goto _door_error;
   }
 

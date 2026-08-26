@@ -119,7 +119,7 @@ int mqConnect (mqconn_t *conn)
     case MQRC_NONE:
       if (args.verbose)
         printf ("Connected to queue manager: %s\n",
-                strlen (conn->qmgr) > 0 ? conn->qmgr : "(default)");
+                strlen (conn->qmgr) > 0 ? conn->qmgr : "(default qmgr)");
       sysRc = 0;
       goto _door;
 
@@ -349,7 +349,7 @@ int mqInquireErrorLog (mqconn_t *conn)
   if (mqOpenQueue( conn                  ,
                    MQ_ADMIN_COMMAND_QUEUE, 
                    args.remQmgr          ,
-                   MQOO_OUTPUT           , 
+                   MQOO_OUTPUT | MQOO_INQUIRE | MQOO_FAIL_IF_QUIESCING ,
                    &hAdminQ              ) != MQRC_NONE )
   {
     sysRc = 1;
@@ -369,7 +369,7 @@ int mqInquireErrorLog (mqconn_t *conn)
 
     MQOPEN (conn->hConn,
             &replyOd,
-            MQOO_INPUT_EXCLUSIVE | MQOO_FAIL_IF_QUIESCING,
+            MQOO_INPUT_EXCLUSIVE | MQOO_INQUIRE | MQOO_FAIL_IF_QUIESCING,
             &hReplyQ,
             &cc,
             &rc);
