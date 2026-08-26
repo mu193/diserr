@@ -46,6 +46,7 @@ void cmdlInit (void)
   args.logFile   = NULL;      // error log file name (-l)
   args.timeStamp = NULL;      // ISO 8601 timestamp for filtering (-t)
   args.remQmgr   = NULL;      // remote qmgr name for PCF execution (-r)
+  args.output    = strdup ("stdout"); // output destination (-o)
   args.verbose   = 0;         // print all selectors (-v)
   args.format    = FMT_TEXT;  // output format: text or json (-f)
   args.printTime = 0;         // print timestamp with each entry (--print-time)
@@ -68,6 +69,7 @@ int cmdlParse (int argc, char *argv[])
     {"logFile",     required_argument, 0, 'l'},
     {"timeStamp",   required_argument, 0, 't'},
     {"format",      required_argument, 0, 'f'},
+    {"output",      required_argument, 0, 'o'},
     {"help",        no_argument,       0, 'h'},
     {"verbose",     no_argument,       0, 'v'},
     {"print-time",  no_argument,       0, 1001},
@@ -84,7 +86,7 @@ int cmdlParse (int argc, char *argv[])
     }
   }
 
-  while ((opt = getopt_long (argc, argv, "m:c:r:l:t:f:hv",
+  while ((opt = getopt_long (argc, argv, "m:c:r:l:t:f:o:hv",
                              long_options, &option_index)) != -1)
   {
     switch (opt)
@@ -193,6 +195,16 @@ int cmdlParse (int argc, char *argv[])
         }
         break;
 
+      case 'o':
+        free (args.output);
+        args.output = strdup (optarg);
+        if (args.output == NULL)
+        {
+          fprintf (stderr, "Error: Memory allocation failed\n");
+          goto _door_error;
+        }
+        break;
+
       case 'v':
         args.verbose = 1;
         break;
@@ -250,6 +262,7 @@ void cmdlUsage (const char *progname)
   printf ("  -l, --logFile     <name>   Error log file name (e.g. AMQERR01)\n");
   printf ("  -t, --timeStamp   <iso>    Show entries after this ISO 8601 timeStamp\n");
   printf ("  -f, --format      <fmt>    Output format: text (default) or json\n");
+  printf ("  -o, --output      <dest>   Output destination: stdout or a file name\n");
   printf ("  -v, --verbose              Print all PCF selectors (default: log records only)\n");
   printf ("      --print-time           Print timestamp with each log entry\n");
   printf ("      --version              Print version information\n");
@@ -302,6 +315,12 @@ void cmdlCleanup (void)
   {
     free (args.remQmgr);
     args.remQmgr = NULL;
+  }
+
+  if (args.output != NULL)
+  {
+    free (args.output);
+    args.output = NULL;
   }
 }
 

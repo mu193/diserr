@@ -14,6 +14,7 @@ Options:
   -l, --logFile     <name>   Error log file name (e.g. AMQERR01)
   -t, --timeStamp   <iso>    Show entries after ISO 8601 timeStamp
   -f, --format      <fmt>    Output format: text (default) or json
+  -o, --output      <dest>   Output destination: stdout or a file name
   -v, --verbose              Print all PCF selectors (default: log records only)
       --print-time           Print timestamp with each log entry
       --version              Print version information
@@ -46,6 +47,8 @@ Timestamp format (-t):
 | Version | Description |
 | --- | --- |
 | 1.0.0 | Initial release |
+| 1.1.0 | Failed functionality |
 | 1.0.1 | Core dump remote queue-manager bug fix |
 | 1.0.2 | Reply queue renamed |
+| 1.2.0 | client -- proxy -- target |
 

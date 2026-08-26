@@ -247,6 +247,7 @@ int mqCloseQueue (mqconn_t *conn, MQHOBJ *hObj)
 /******************************************************************************/
 int mqInquireErrorLog (mqconn_t *conn)
 {
+
   // -------------------------------------------------------
   // Request parameters from command line args.
   // -------------------------------------------------------
@@ -525,7 +526,8 @@ int mqInquireErrorLog (mqconn_t *conn)
       // Output format: text 
       // ---------------------------------------------------
       case FMT_TEXT:
-        printf ("%.*s\n", (int) recLen, record);
+        // Output the error log record in text format.
+        fprintf (stdout, "%.*s\n", (int) recLen, record);
         break;
 
       // ---------------------------------------------------
@@ -545,7 +547,7 @@ int mqInquireErrorLog (mqconn_t *conn)
         {
           fputs (json, stdout);
           if (json[0] != '\0' && json[strlen (json) - 1] != '\n')
-            fputc ('\n', stdout);
+            fputc ('\n', stdout);   // ouput the error log record in json format
           free (json);
         }
         break;

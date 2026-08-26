@@ -14,6 +14,7 @@
      -l, --logFile     <name>  Error log file name (e.g. AMQERR01)
      -t, --timeStamp   <iso>   Show entries after ISO 8601 timestamp
      -f, --format      <fmt>   Output format: text (default) or json
+    -o, --output      <dest>  Output destination: stdout or a file name
      -v, --verbose             Print all PCF selectors (default: log records only)
      -h, --help                Display this help message
        --version             Print version information
@@ -21,6 +22,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "cmdline.h"
 #include "mqutil.h"
 #include "version.h"
@@ -56,6 +58,13 @@ int main (int argc, char *argv[])
       goto _door_error;
   }
 
+  if (strcmp (args.output, "stdout") != 0
+      && freopen (args.output, "w", stdout) == NULL)
+  {
+    fprintf (stderr, "Error: cannot open output file '%s'\n", args.output);
+    goto _door_error;
+  }
+
   // -------------------------------------------------------
   // Initialize MQ connection.  
   // -------------------------------------------------------
@@ -80,6 +89,12 @@ int main (int argc, char *argv[])
   // -------------------------------------------------------
   rc = mqInquireErrorLog (&conn);
   switch (rc)
+    if (strcmp (args.output, "stdout") != 0
+        && freopen (args.output, "w", stdout) == NULL)
+    {
+      fprintf (stderr, "Error: cannot open output file '%s'\n", args.output);
+      goto _door_error;
+    }
   {
     case 0:           // Success - continue.  
       break;          //
