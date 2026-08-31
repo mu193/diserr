@@ -39,6 +39,11 @@
 #define MQ_DISERR_REPLY          "MONITOR.DISERR.REPLY.*"
 
 /******************************************************************************/
+/*                               G L O B A L S                                */
+/******************************************************************************/
+FILE *gRealStdout = NULL;   // real stdout, saved before -o/--output redirection
+
+/******************************************************************************/
 /*                                                                            */
 /*                             F U N C T I O N S                              */
 /*                                                                            */
@@ -439,7 +444,8 @@ int mqInquireErrorLog (mqconn_t *conn)
         // No entries match the criteria - not an error.
         // -------------------------------------------------
         case MQRCCF_NONE_FOUND: 
-          printf ("No error log entries found for the given criteria.\n");
+          fprintf (gRealStdout != NULL ? gRealStdout : stdout,
+                    "No error log entries found for the given criteria.\n");
           sysRc = 0;
           break;
 
@@ -563,7 +569,8 @@ int mqInquireErrorLog (mqconn_t *conn)
     // Print timestamp oft the last log entry if requested.
     // -----------------------------------------------------
     if (args.printTime && rc == MQRC_NONE)
-      printf ("%.*s\n", (int) timeLen, isotime);
+      fprintf (gRealStdout != NULL ? gRealStdout : stdout,
+                "%.*s\n", (int) timeLen, isotime);
   }
 
   _cleanup:

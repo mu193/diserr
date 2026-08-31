@@ -20,9 +20,12 @@
        --version             Print version information
 */
 
+#define _POSIX_C_SOURCE 200809L  // fileno, fdopen, dup
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include "cmdline.h"
 #include "mqutil.h"
 #include "version.h"
@@ -56,6 +59,18 @@ int main (int argc, char *argv[])
       goto _door_ok;
     case -1:           // Parse error - exit with failure.  
       goto _door_error;
+  }
+
+  // -------------------------------------------------------
+  // Save the real stdout before possibly redirecting it to
+  // a file with -o/--output, so --print-time can still write
+  // timestamps to the terminal instead of the output file.
+  // -------------------------------------------------------
+  gRealStdout = fdopen (dup (fileno (stdout)), "w");
+  if (gRealStdout == NULL)
+  {
+    fprintf (stderr, "Error: cannot duplicate stdout\n");
+    goto _door_error;
   }
 
   if (strcmp (args.output, "stdout") != 0
@@ -111,10 +126,12 @@ int main (int argc, char *argv[])
   }
 
   _door_ok:
+    if (gRealStdout != NULL) fclose (gRealStdout);
     cmdlCleanup ();
     return EXIT_SUCCESS;
 
   _door_error:
+    if (gRealStdout != NULL) fclose (gRealStdout);
     cmdlCleanup ();
     return EXIT_FAILURE;
 

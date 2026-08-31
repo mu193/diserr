@@ -18,11 +18,19 @@
 #ifndef MQUTIL_H
 #define MQUTIL_H
 
+#include <stdio.h>
 #include <cmqc.h>
 
 /******************************************************************************/
 /*                               T Y P E S                                    */
 /******************************************************************************/
+
+// ---------------------------------------------------------
+// Real stdout stream, saved before -o/--output may redirect
+// the "stdout" stream to a file.  --print-time output always
+// goes here so timestamps are never sent to the output file.
+// ---------------------------------------------------------
+extern FILE *gRealStdout;
 
 // ---------------------------------------------------------
 // MQ connection state.
