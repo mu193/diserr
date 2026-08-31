@@ -89,12 +89,6 @@ int main (int argc, char *argv[])
   // -------------------------------------------------------
   rc = mqInquireErrorLog (&conn);
   switch (rc)
-    if (strcmp (args.output, "stdout") != 0
-        && freopen (args.output, "w", stdout) == NULL)
-    {
-      fprintf (stderr, "Error: cannot open output file '%s'\n", args.output);
-      goto _door_error;
-    }
   {
     case 0:           // Success - continue.  
       break;          //
