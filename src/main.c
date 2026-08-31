@@ -74,7 +74,7 @@ int main (int argc, char *argv[])
   }
 
   if (strcmp (args.output, "stdout") != 0
-      && freopen (args.output, "w", stdout) == NULL)
+      && freopen (args.output, "a", stdout) == NULL)
   {
     fprintf (stderr, "Error: cannot open output file '%s'\n", args.output);
     goto _door_error;
