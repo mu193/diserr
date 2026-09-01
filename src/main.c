@@ -14,14 +14,25 @@
      -l, --logFile     <name>  Error log file name (e.g. AMQERR01)
      -t, --timeStamp   <iso>   Show entries after ISO 8601 timestamp
      -f, --format      <fmt>   Output format: text (default) or json
-    -o, --output      <dest>  Output destination: stdout or a file name
+     -o, --output      <dest>  Output destination: stdout or a file name
      -v, --verbose             Print all PCF selectors (default: log records only)
+         --print-time          Print timestamp with each log entry
      -h, --help                Display this help message
-       --version             Print version information
+         --version             Print version information
 */
 
+/******************************************************************************/
+/*                                D E F I N E S                               */
+/******************************************************************************/
+
+// -------------------------------------
+// compiler features 
+// -------------------------------------
 #define _POSIX_C_SOURCE 200809L  // fileno, fdopen, dup
 
+/******************************************************************************/
+/*                               I N C L U D E S                              */
+/******************************************************************************/
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

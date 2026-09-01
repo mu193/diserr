@@ -13,7 +13,24 @@
                              yyyy-mm-ddThh:mm:ss.sssZ (static)
 */
 
-#define _GNU_SOURCE             // GNU extensions (timegm) + POSIX.1-2008
+
+/******************************************************************************/
+/*                                D E F I N E S                               */
+/******************************************************************************/
+
+// -------------------------------------
+// compiler features 
+// -------------------------------------
+#define _GNU_SOURCE              // GNU extensions (timegm) + POSIX.1-2008
+
+// -------------------------------------
+// Final output is fixed at 24 chars + null; 
+// fullTs may be longer before UTC normalization.
+// -------------------------------------
+#define CMDL_ISO_TIME_BUFLEN 25  // yyyy-mm-ddThh:mm:ss.sssZ + null terminator
+#define CMDL_FULL_TS_BUFLEN  32  // yyyy-mm-ddT + accepted time-only input
+
+/******************************************************************************/
 /*                               I N C L U D E S                              */
 /******************************************************************************/
 #include <stdio.h>
@@ -55,11 +72,16 @@ void cmdlInit (void)
 
 /******************************************************************************/
 /* Parse command line arguments.                                              */
+/*                                                                            */
+/* retrun code:                                                               */
+/*   0:  on success,                                                          */
+/*   1:  for help,                                                            */
+/*   2:  for version,                                                         */
+/*  -1:  on parse error.                                                      */
 /******************************************************************************/
 int cmdlParse (int argc, char *argv[])
 {
   int opt;
-  int arg_index;
   int option_index = 0;
 
   static struct option long_options[] = {
@@ -77,24 +99,18 @@ int cmdlParse (int argc, char *argv[])
     {0, 0, 0, 0}
   };
 
-  for (arg_index = 1; arg_index < argc; arg_index++)
-  {
-    if (strcmp (argv[arg_index], "--version") == 0 && argc != 2)
-    {
-      fprintf (stderr, "Error: --version cannot be combined with other arguments\n");
-      return -1;
-    }
-  }
-
+  // -------------------------------------------------------
+  // Parse each command-line option and update args accordingly.
+  // -------------------------------------------------------
   while ((opt = getopt_long (argc, argv, "m:c:r:l:t:f:o:hv",
                              long_options, &option_index)) != -1)
   {
     switch (opt)
     {
-      // -------------------------------------------------------
+      // ---------------------------------------------------
       // Connection mode: binding (-m) 
       //   sets args.qmgr and args.connType to BINDING
-      // -------------------------------------------------------
+      // ---------------------------------------------------
       case 'm':
         if (args.qmgr != NULL)    // (-c) was already specified, 
         {                         //   error: mutually exclusive
@@ -110,10 +126,10 @@ int cmdlParse (int argc, char *argv[])
         }
         break;
 
-      // -------------------------------------------------------
+      // ---------------------------------------------------
       // Connection mode: client (-c)
       //   sets args.qmgr and args.connType to CLIENT
-      // -------------------------------------------------------  
+      // ---------------------------------------------------
       case 'c':
         if (args.qmgr != NULL)    // (-m) was already specified, 
         {                         //   error: mutually exclusive
@@ -129,10 +145,10 @@ int cmdlParse (int argc, char *argv[])
         }
         break;
 
-      // -------------------------------------------------------  
+      // ---------------------------------------------------
       // Remote queue manager for PCF execution (-r)
       //   sets args.remQmgr
-      // -------------------------------------------------------
+      // ---------------------------------------------------
       case 'r':
         args.remQmgr = strdup (optarg);
         if (args.remQmgr == NULL)
@@ -142,10 +158,10 @@ int cmdlParse (int argc, char *argv[])
         }
         break;
 
-      // -------------------------------------------------------
+      // ---------------------------------------------------
       // Log file (-l)
       //   sets args.logFile
-      // -------------------------------------------------------
+      // ---------------------------------------------------
       case 'l':   // only allow AMQERR01, AMQERR02, AMQERR03, 
         {         //   with optional .LOG suffix
           if (!(   strncmp (optarg, "AMQERR0", 7) == 0
@@ -164,14 +180,14 @@ int cmdlParse (int argc, char *argv[])
         }
         break;
 
-      // -------------------------------------------------------
+      // ---------------------------------------------------
       // Timestamp filter (-t)
       //   validates and normalizes to yyyy-mm-ddThh:mm:ss.sssZ,
       //   sets args.timeStamp
-      // -------------------------------------------------------
+      // ---------------------------------------------------
       case 't':
         {
-          char isoBuf[25];
+          char isoBuf[CMDL_ISO_TIME_BUFLEN];
           if (cmdlNormalizeIsoTime (optarg, isoBuf, sizeof (isoBuf)) != 0)
             goto _door_error;
           args.timeStamp = strdup (isoBuf);
@@ -183,6 +199,10 @@ int cmdlParse (int argc, char *argv[])
         }
         break;
 
+      // ---------------------------------------------------
+      // Output format (-f)
+      //   accepts text or json
+      // ---------------------------------------------------
       case 'f':
         if (strcmp (optarg, "text") == 0)
           args.format = FMT_TEXT;
@@ -195,6 +215,10 @@ int cmdlParse (int argc, char *argv[])
         }
         break;
 
+      // ---------------------------------------------------
+      // Output destination (-o)
+      //   file name or stdout, stdout is default
+      // ---------------------------------------------------
       case 'o':
         free (args.output);
         args.output = strdup (optarg);
@@ -204,25 +228,38 @@ int cmdlParse (int argc, char *argv[])
           goto _door_error;
         }
         break;
-
+      // ---------------------------------------------------
+      // Verbose mode (-v)
+      // ---------------------------------------------------
       case 'v':
         args.verbose = 1;
         break;
 
+      // ---------------------------------------------------
+      // Print time (--print-time), long format only.
+      //   print out the timestamp of the last log entry
+      //   in format yyyy-mm-ddThh:mm:ss.sssZ 
+      // ---------------------------------------------------
       case 1001:
         args.printTime = 1;
         break;
 
+      // ---------------------------------------------------
+      // Version (--version)
+      // ---------------------------------------------------
       case 1002:
         args.version = 1;
         break;
 
-      // -------------------------------------------------------
+      // ---------------------------------------------------
       // Help (-h) / usage
-      // -------------------------------------------------------
+      // ---------------------------------------------------
       case '?':
         goto _door_error;
 
+      // ---------------------------------------------------
+      // Help (-h) / usage
+      // ---------------------------------------------------
       case 'h':
         cmdlUsage (argv[0]);
         return 1;
@@ -338,7 +375,7 @@ void cmdlCleanup (void)
 /*   2026-05-31            -> from 2026-05-31T00:00:00 on (local)             */
 /*   2026-05-31T13:15      -> from 2026-05-31T13:15:00 on (local)             */
 /*   2026-05-31T13:15Z     -> from 2026-05-31T13:15:00 on (UTC)               */
-/*   2026-05-31T13:15+02:00 -> from 2026-05-31T11:15:00Z on (CEST offset)    */
+/*   2026-05-31T13:15+02:00 -> from 2026-05-31T11:15:00Z on (CEST offset)     */
 /*                                                                            */
 /* Priority 1: fill missing time components (hh, mm, ss, sss) with zero.      */
 /* Priority 2: return -1 and print an error if the input cannot be parsed.    */
@@ -350,13 +387,15 @@ void cmdlCleanup (void)
 /*                                                                            */
 /* Returns 0 on success, -1 on failure.                                       */
 /******************************************************************************/
-static int cmdlNormalizeIsoTime (const char *ts, char *buf, size_t bufLen)
+static int cmdlNormalizeIsoTime(const char *ts    , // input timestamp string
+                                char       *buf   , // output buffer for normalized timestamp
+                                size_t      bufLen) // length of the output buffer
 {
   int         year = 0, mon = 0, day = 0;
   int         hour = 0, min = 0, sec = 0, ms = 0;
   size_t      len  = strlen (ts);
   int         n;
-  char        fullTs[32];
+  char        fullTs[CMDL_FULL_TS_BUFLEN];
   const char *origTs = ts;    // keep original for error messages
 
   // -------------------------------------------------------
@@ -461,7 +500,7 @@ static int cmdlNormalizeIsoTime (const char *ts, char *buf, size_t bufLen)
   }                                           // ---------------
 
   struct tm *utc = gmtime (&t);
-  if (utc == NULL || bufLen < 25
+  if (utc == NULL || bufLen < CMDL_ISO_TIME_BUFLEN
       || strftime (buf, bufLen, "%Y-%m-%dT%H:%M:%S", utc) != 19)
     return -1;
   snprintf (buf + 19, bufLen - 19, ".%03dZ", ms);

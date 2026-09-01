@@ -130,7 +130,7 @@ $(TMP_DIR)mqreason.c.0: $(TMP_DIR)mqreason.tmp
 		next if $$2 =~ /MQRCCF_IPADDR_ERROR/;                     \
         next if $$2 =~ /rrcI_NORMAL_CHANNEL_END_CONN/;            \
 		next if $$2 =~ /rrcI_CHANNEL_START_CONN/;                 \
-	    printf("     convert(%-40s) ;\n", $$2);          }' $< > $@
+	    printf("     convert( %-40s) ;\n", $$2);         }' $< > $@
 
 $(INC_DIR)mqreason.h: $(ETC_DIR)mqreason.sh $(TMP_DIR)mqreason.h.0 $(ETC_DIR)mqreason.eh 
 	cat $^ > $@

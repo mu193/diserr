@@ -46,9 +46,12 @@ Timestamp format (-t):
 
 | Version | Description |
 | --- | --- |
-| 1.0.0 | Initial release |
+| 1.0.0 | **Initial release** |
 | 1.1.0 | Failed functionality |
 | 1.0.1 | Core dump remote queue-manager bug fix |
 | 1.0.2 | Reply queue renamed |
 | 1.2.0 | client -- proxy -- target |
+| 1.2.1 | New CLI --output attribute and output functionality |
+| 1.2.2 | Fix --print-time and MQRCCF_NONE_FOUND redirection with --output |
+| 1.2.3 | Code cleanup for 1.2 |
 

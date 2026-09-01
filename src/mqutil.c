@@ -34,9 +34,9 @@
 /******************************************************************************/
 /*                               D E F I N E S                                */
 /******************************************************************************/
-#define MQ_1MB_BUF_LEN          (1024 * 1024)  /* 1 MB read buffer for PCF string values */
-#define MQ_ADMIN_COMMAND_QUEUE   "SYSTEM.ADMIN.COMMAND.QUEUE"
-#define MQ_DISERR_REPLY          "MONITOR.DISERR.REPLY.*"
+#define MQ_1MB_BUF_LEN         (1024 * 1024) // 1MB read buffer for PCF replies
+#define MQ_ADMIN_COMMAND_QUEUE "SYSTEM.ADMIN.COMMAND.QUEUE"
+#define MQ_DISERR_REPLY        "MONITOR.DISERR.REPLY.*"
 
 /******************************************************************************/
 /*                               G L O B A L S                                */
@@ -113,6 +113,9 @@ int mqConnect (mqconn_t *conn)
       break;
   }
 
+  // -------------------------------------------------------
+  // Connect to the queue manager using the prepared options.
+  // -------------------------------------------------------
   MQCONNX (qmgr,
            &cno,
            &conn->hConn,
@@ -181,15 +184,18 @@ int mqDisconnect (mqconn_t *conn)
 /* Open a queue.                                                              */
 /* Pass NULL or "" for rQmgr to target the local queue manager.               */
 /******************************************************************************/
-int mqOpenQueue ( mqconn_t   *conn   ,  // MQ connection handle and state
-                  const char *qName  ,  // name of the queue to open
-                  const char *rQmgr  ,  // queue manager (NULL/"" = local)
+int mqOpenQueue ( mqconn_t   *conn    ,  // MQ connection handle and state
+                  const char *qName   ,  // name of the queue to open
+                  const char *rQmgr   ,  // queue manager (NULL/"" = local)
                   MQLONG      options ,  // MQOO_* open options
                   MQHOBJ     *hObj    )  // returned object handle
 {
   MQOD   od = {MQOD_DEFAULT};  // Object descriptor: queue name and options
   MQLONG cc, rc;               // MQ completion code and reason code
 
+// ---------------------------------------------------------
+// avoid warnings about string truncation with GCC.
+// ---------------------------------------------------------
 #ifdef __GNUC__
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wstringop-truncation"
@@ -205,6 +211,10 @@ int mqOpenQueue ( mqconn_t   *conn   ,  // MQ connection handle and state
 #pragma GCC diagnostic pop
 #endif
 
+
+  // -------------------------------------------------------
+  // Open the queue using the prepared object descriptor and options.
+  // -------------------------------------------------------
   MQOPEN (conn->hConn, &od, options, hObj, &cc, &rc);
 
   switch (rc)
@@ -504,6 +514,7 @@ int mqInquireErrorLog (mqconn_t *conn)
                      NULL                   ,
                      &cc                    ,
                      &rc                   );
+
     if (rc != MQRC_NONE)
     {
       fprintf (stderr, "mqInquireString MQCACF_ERROR_LOG_RECORD failed: %d %s\n",
@@ -582,4 +593,3 @@ int mqInquireErrorLog (mqconn_t *conn)
 
   return sysRc;
 }
-

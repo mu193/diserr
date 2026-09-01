@@ -18,12 +18,13 @@
       1.2.0 - client -- proxy -- target
       1.2.1 - new CLI --output attribute and output functionality
       1.2.2 - fix --print-time and MQRCCF_NONE_FOUND redirection with --output
+      1.2.3 - code cleanup for 1.2
 */
 
 #ifndef VERSION_H
 #define VERSION_H
 
-#define VERSION "1.2.2"
+#define VERSION "1.2.3"
 
 void version(void);
 
