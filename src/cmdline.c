@@ -64,6 +64,7 @@ void cmdlInit (void)
   args.timeStamp = NULL;      // ISO 8601 timestamp for filtering (-t)
   args.remQmgr   = NULL;      // remote qmgr name for PCF execution (-r)
   args.output    = strdup ("stdout"); // output destination (-o)
+  args.daemon    = 0;         // daemon mode (-d)
   args.verbose   = 0;         // print all selectors (-v)
   args.format    = FMT_TEXT;  // output format: text or json (-f)
   args.printTime = 0;         // print timestamp with each entry (--print-time)
@@ -92,6 +93,7 @@ int cmdlParse (int argc, char *argv[])
     {"timeStamp",   required_argument, 0, 't'},
     {"format",      required_argument, 0, 'f'},
     {"output",      required_argument, 0, 'o'},
+    {"daemon",      no_argument,       0, 'd'},
     {"help",        no_argument,       0, 'h'},
     {"verbose",     no_argument,       0, 'v'},
     {"print-time",  no_argument,       0, 1001},
@@ -102,7 +104,7 @@ int cmdlParse (int argc, char *argv[])
   // -------------------------------------------------------
   // Parse each command-line option and update args accordingly.
   // -------------------------------------------------------
-  while ((opt = getopt_long (argc, argv, "m:c:r:l:t:f:o:hv",
+  while ((opt = getopt_long (argc, argv, "m:c:r:l:t:f:o:dhv",
                              long_options, &option_index)) != -1)
   {
     switch (opt)
@@ -228,6 +230,15 @@ int cmdlParse (int argc, char *argv[])
           goto _door_error;
         }
         break;
+
+      // ---------------------------------------------------
+      // Daemon mode (-d)
+      //   collect data from all configured remote queue managers
+      // ---------------------------------------------------
+      case 'd':
+        args.daemon = 1;
+        break;
+
       // ---------------------------------------------------
       // Verbose mode (-v)
       // ---------------------------------------------------
@@ -300,6 +311,7 @@ void cmdlUsage (const char *progname)
   printf ("  -t, --timeStamp   <iso>    Show entries after this ISO 8601 timeStamp\n");
   printf ("  -f, --format      <fmt>    Output format: text (default) or json\n");
   printf ("  -o, --output      <dest>   Output destination: stdout or a file name\n");
+  printf ("  -d, --daemon               Collect data from all configured remote queue managers\n");
   printf ("  -v, --verbose              Print all PCF selectors (default: log records only)\n");
   printf ("      --print-time           Print timestamp with each log entry\n");
   printf ("      --version              Print version information\n");

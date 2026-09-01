@@ -15,6 +15,7 @@ Options:
   -t, --timeStamp   <iso>    Show entries after ISO 8601 timeStamp
   -f, --format      <fmt>    Output format: text (default) or json
   -o, --output      <dest>   Output destination: stdout or a file name
+  -d, --daemon               Collect data from all configured remote queue managers
   -v, --verbose              Print all PCF selectors (default: log records only)
       --print-time           Print timestamp with each log entry
       --version              Print version information
@@ -54,4 +55,5 @@ Timestamp format (-t):
 | 1.2.1 | New CLI --output attribute and output functionality |
 | 1.2.2 | Fix --print-time and MQRCCF_NONE_FOUND redirection with --output |
 | 1.2.3 | Code cleanup for 1.2 |
+| 2.0.0 | Automatic collection of logs for remote queue manager |
 

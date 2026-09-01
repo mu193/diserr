@@ -19,12 +19,13 @@
       1.2.1 - new CLI --output attribute and output functionality
       1.2.2 - fix --print-time and MQRCCF_NONE_FOUND redirection with --output
       1.2.3 - code cleanup for 1.2
+      2.0.0 - automatic collection of logs for remote queue manager
 */
 
 #ifndef VERSION_H
 #define VERSION_H
 
-#define VERSION "1.2.3"
+#define VERSION "2.0.0"
 
 void version(void);
 

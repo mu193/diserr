@@ -49,6 +49,7 @@ typedef struct
   char       *timeStamp;  // ISO 8601 timestamp (-t) for filtering log entries
   char       *remQmgr;    // remote queue manager name (-r) for PCF execution
   char       *output;     // output destination (-o): stdout or file name
+  int         daemon;     // daemon mode (-d): collect all configured remote qmgrs
   int         verbose;    // verbose output (-v): print all selectors
   formatType_t format;    // output format (-f): text (default) or json
   int         printTime;  // print timestamp with each entry (--print-time)

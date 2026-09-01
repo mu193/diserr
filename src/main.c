@@ -15,6 +15,7 @@
      -t, --timeStamp   <iso>   Show entries after ISO 8601 timestamp
      -f, --format      <fmt>   Output format: text (default) or json
      -o, --output      <dest>  Output destination: stdout or a file name
+      -d, --daemon              Collect data from all configured remote queue managers
      -v, --verbose             Print all PCF selectors (default: log records only)
          --print-time          Print timestamp with each log entry
      -h, --help                Display this help message
@@ -40,6 +41,9 @@
 #include "cmdline.h"
 #include "mqutil.h"
 #include "version.h"
+
+int foreground (mqconn_t *conn);
+int daemonize  (mqconn_t *conn);
 
 int main (int argc, char *argv[])
 {
@@ -73,25 +77,6 @@ int main (int argc, char *argv[])
   }
 
   // -------------------------------------------------------
-  // Save the real stdout before possibly redirecting it to
-  // a file with -o/--output, so --print-time can still write
-  // timestamps to the terminal instead of the output file.
-  // -------------------------------------------------------
-  gRealStdout = fdopen (dup (fileno (stdout)), "w");
-  if (gRealStdout == NULL)
-  {
-    fprintf (stderr, "Error: cannot duplicate stdout\n");
-    goto _door_error;
-  }
-
-  if (strcmp (args.output, "stdout") != 0
-      && freopen (args.output, "a", stdout) == NULL)
-  {
-    fprintf (stderr, "Error: cannot open output file '%s'\n", args.output);
-    goto _door_error;
-  }
-
-  // -------------------------------------------------------
   // Initialize MQ connection.  
   // -------------------------------------------------------
   mqInit (&conn);
@@ -109,18 +94,16 @@ int main (int argc, char *argv[])
   /**************************************************************************/
   /*                            R E A L   W O R K                           */
   /**************************************************************************/
-
-  // -------------------------------------------------------
-  // Inquire error log.    
-  // -------------------------------------------------------
-  rc = mqInquireErrorLog (&conn);
-  switch (rc)
+  if (args.daemon)
   {
-    case 0:           // Success - continue.  
-      break;          //
-    default:          // Error - exit with failure.  
-      goto _door_error;
+    rc = daemonize (&conn);
   }
+  else
+  {
+    rc = foreground (&conn);
+  }
+  if (rc)
+    goto _door_error;
 
   /**************************************************************************/
   /*                          H O U S E K E E P I N G                       */
@@ -146,4 +129,55 @@ int main (int argc, char *argv[])
     cmdlCleanup ();
     return EXIT_FAILURE;
 
+}
+
+/******************************************************************************/
+/* Run in foreground mode.                                                    */
+/******************************************************************************/
+int foreground (mqconn_t *conn)
+{
+  int rc;
+
+  // -------------------------------------------------------
+  // Save the real stdout before possibly redirecting it to
+  // a file with -o/--output, so --print-time can still write
+  // timestamps to the terminal instead of the output file.
+  // -------------------------------------------------------
+  gRealStdout = fdopen (dup (fileno (stdout)), "w");
+  if (gRealStdout == NULL)
+  {
+    fprintf (stderr, "Error: cannot duplicate stdout\n");
+    return -1;
+  }
+
+  if (strcmp (args.output, "stdout") != 0
+      && freopen (args.output, "a", stdout) == NULL)
+  {
+    fprintf (stderr, "Error: cannot open output file '%s'\n", args.output);
+    return -1;
+  }
+
+  // -------------------------------------------------------
+  // Inquire error log.
+  // -------------------------------------------------------
+  rc = mqInquireErrorLog (conn);
+  switch (rc)
+  {
+    case 0:           // Success - continue.
+      break;          //
+    default:          // Error - exit with failure.
+      return -1;
+  }
+
+  return 0;
+}
+
+/******************************************************************************/
+/* Run in daemon mode.                                                        */
+/******************************************************************************/
+int daemonize (mqconn_t *conn)
+{
+  (void) conn;
+
+  return 0;
 }
