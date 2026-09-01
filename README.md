@@ -16,6 +16,7 @@ Options:
   -f, --format      <fmt>    Output format: text (default) or json
   -o, --output      <dest>   Output destination: stdout or a file name
   -d, --daemon               Collect data from all configured remote queue managers
+      --add-qmgr    <name>   Add queue manager to daemon configuration
   -v, --verbose              Print all PCF selectors (default: log records only)
       --print-time           Print timestamp with each log entry
       --version              Print version information

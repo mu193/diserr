@@ -48,6 +48,7 @@ typedef struct
   char       *logFile;    // error log file name (-l)
   char       *timeStamp;  // ISO 8601 timestamp (-t) for filtering log entries
   char       *remQmgr;    // remote queue manager name (-r) for PCF execution
+  char       *addQmgr;    // queue manager name to add to daemon configuration
   char       *output;     // output destination (-o): stdout or file name
   int         daemon;     // daemon mode (-d): collect all configured remote qmgrs
   int         verbose;    // verbose output (-v): print all selectors

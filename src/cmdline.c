@@ -63,6 +63,7 @@ void cmdlInit (void)
   args.logFile   = NULL;      // error log file name (-l)
   args.timeStamp = NULL;      // ISO 8601 timestamp for filtering (-t)
   args.remQmgr   = NULL;      // remote qmgr name for PCF execution (-r)
+  args.addQmgr   = NULL;      // qmgr name to add to daemon configuration
   args.output    = strdup ("stdout"); // output destination (-o)
   args.daemon    = 0;         // daemon mode (-d)
   args.verbose   = 0;         // print all selectors (-v)
@@ -94,6 +95,7 @@ int cmdlParse (int argc, char *argv[])
     {"format",      required_argument, 0, 'f'},
     {"output",      required_argument, 0, 'o'},
     {"daemon",      no_argument,       0, 'd'},
+    {"add-qmgr",    required_argument, 0, 1003},
     {"help",        no_argument,       0, 'h'},
     {"verbose",     no_argument,       0, 'v'},
     {"print-time",  no_argument,       0, 1001},
@@ -240,6 +242,18 @@ int cmdlParse (int argc, char *argv[])
         break;
 
       // ---------------------------------------------------
+      // Add queue manager to daemon configuration (--add-qmgr)
+      // ---------------------------------------------------
+      case 1003:
+        args.addQmgr = strdup (optarg);
+        if (args.addQmgr == NULL)
+        {
+          fprintf (stderr, "Error: Memory allocation failed\n");
+          goto _door_error;
+        }
+        break;
+
+      // ---------------------------------------------------
       // Verbose mode (-v)
       // ---------------------------------------------------
       case 'v':
@@ -312,6 +326,7 @@ void cmdlUsage (const char *progname)
   printf ("  -f, --format      <fmt>    Output format: text (default) or json\n");
   printf ("  -o, --output      <dest>   Output destination: stdout or a file name\n");
   printf ("  -d, --daemon               Collect data from all configured remote queue managers\n");
+  printf ("      --add-qmgr    <name>   Add queue manager to daemon configuration\n");
   printf ("  -v, --verbose              Print all PCF selectors (default: log records only)\n");
   printf ("      --print-time           Print timestamp with each log entry\n");
   printf ("      --version              Print version information\n");
@@ -364,6 +379,12 @@ void cmdlCleanup (void)
   {
     free (args.remQmgr);
     args.remQmgr = NULL;
+  }
+
+  if (args.addQmgr != NULL)
+  {
+    free (args.addQmgr);
+    args.addQmgr = NULL;
   }
 
   if (args.output != NULL)

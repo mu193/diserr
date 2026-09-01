@@ -16,6 +16,7 @@
      -f, --format      <fmt>   Output format: text (default) or json
      -o, --output      <dest>  Output destination: stdout or a file name
       -d, --daemon              Collect data from all configured remote queue managers
+       --add-qmgr    <name>   Add queue manager to daemon configuration
      -v, --verbose             Print all PCF selectors (default: log records only)
          --print-time          Print timestamp with each log entry
      -h, --help                Display this help message
@@ -39,11 +40,13 @@
 #include <string.h>
 #include <unistd.h>
 #include "cmdline.h"
+#include "mqlogctl.h"
 #include "mqutil.h"
 #include "version.h"
 
 int foreground (mqconn_t *conn);
 int daemonize  (mqconn_t *conn);
+int addQmgr    (mqconn_t *conn);
 
 int main (int argc, char *argv[])
 {
@@ -94,6 +97,21 @@ int main (int argc, char *argv[])
   /**************************************************************************/
   /*                            R E A L   W O R K                           */
   /**************************************************************************/
+
+  // -------------------------------------------------------
+  // Handle adding a new queue manager if requested.
+  // -------------------------------------------------------
+  if (args.addQmgr != NULL)
+  {
+    rc = addQmgr (&conn);
+    if (rc)
+      goto _door_error;
+    goto _door_ok;
+  }
+
+  // -------------------------------------------------------
+  // Run as a daemon or in the foreground.
+  // -------------------------------------------------------
   if (args.daemon)
   {
     rc = daemonize (&conn);
@@ -147,14 +165,16 @@ int foreground (mqconn_t *conn)
   if (gRealStdout == NULL)
   {
     fprintf (stderr, "Error: cannot duplicate stdout\n");
-    return -1;
+    rc = -1;
+    goto _door;
   }
 
   if (strcmp (args.output, "stdout") != 0
       && freopen (args.output, "a", stdout) == NULL)
   {
     fprintf (stderr, "Error: cannot open output file '%s'\n", args.output);
-    return -1;
+    rc = -1;
+    goto _door;
   }
 
   // -------------------------------------------------------
@@ -166,10 +186,13 @@ int foreground (mqconn_t *conn)
     case 0:           // Success - continue.
       break;          //
     default:          // Error - exit with failure.
-      return -1;
+      rc = -1;
+      goto _door;
   }
 
-  return 0;
+  _door:
+
+  return rc;
 }
 
 /******************************************************************************/
@@ -177,7 +200,90 @@ int foreground (mqconn_t *conn)
 /******************************************************************************/
 int daemonize (mqconn_t *conn)
 {
-  (void) conn;
+  MQHOBJ hCtrlQ = MQHO_NONE;
+  int mqrc;
+  int rc = 0;
 
-  return 0;
+  // -------------------------------------------------------
+  // open control queue.
+  // -------------------------------------------------------
+  mqrc = mqOpenQueue( conn              ,
+                      MQ_DISERR_CTRL    ,
+                      NULL              ,
+                      MQOO_INPUT_SHARED | MQOO_OUTPUT          |\
+                      MQOO_BROWSE       | MQOO_FAIL_IF_QUIESCING,
+                      &hCtrlQ          );
+
+  switch( mqrc )
+  {
+    case MQRC_NONE:   // Success - continue.
+      break;          //
+    default:          // Error - exit with failure.
+      rc = -1;
+      goto _door;
+  }
+
+  // -------------------------------------------------------
+  // Close control queue.
+  // -------------------------------------------------------
+  mqrc = mqCloseQueue (conn, &hCtrlQ);
+  switch (mqrc)
+  {
+    case MQRC_NONE:   // Success - continue.
+      break;          //
+    default:          // Error - exit with failure.
+      rc = -1;
+      goto _door;
+  }
+
+  _door:
+
+  return rc;
+}
+
+/******************************************************************************/
+/* Add queue manager to daemon configuration.                                 */
+/******************************************************************************/
+int addQmgr (mqconn_t *conn)
+{
+  MQHOBJ hCtrlQ = MQHO_NONE;
+  int mqrc;
+  int rc = 0;
+
+  // -------------------------------------------------------
+  // open control queue for put.
+  // -------------------------------------------------------
+  mqrc = mqOpenQueue( conn              ,
+                      MQ_DISERR_CTRL    ,
+                      NULL              ,
+                      MQOO_OUTPUT       | MQOO_FAIL_IF_QUIESCING,
+                      &hCtrlQ          );
+
+  switch( mqrc )
+  {
+    case MQRC_NONE:   // Success - continue.
+      break;          //
+    default:          // Error - exit with failure.
+      rc = -1;
+      goto _door;
+  }
+
+// call mqPutMsg which is a new not tested function
+
+  // -------------------------------------------------------
+  // Close control queue.
+  // -------------------------------------------------------
+  mqrc = mqCloseQueue (conn, &hCtrlQ);
+  switch (mqrc)
+  {
+    case MQRC_NONE:   // Success - continue.
+      break;          //
+    default:          // Error - exit with failure.
+      rc = -1;
+      goto _door;
+  }
+
+  _door:
+
+  return rc;
 }

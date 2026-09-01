@@ -14,10 +14,12 @@
 #define MQLOGCTL_H
 
 #include <cmqc.h>
+#include "mqutil.h"
 
 /******************************************************************************/
 /*                               D E F I N E S                                */
 /******************************************************************************/
+#define MQ_DISERR_CTRL "MONITOR.DISERR.CONTROL"
 #define MQLOGCTL_ISO_TIME_BUFLEN 25 // yyyy-mm-ddThh:mm:ss.sssZ + null terminator
 
 /******************************************************************************/

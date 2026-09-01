@@ -11,6 +11,7 @@
      mqDisconnect      - Disconnect from queue manager using MQDISC
      mqOpenQueue       - Open a queue using MQOPEN
      mqCloseQueue      - Close a queue opened with mqOpenQueue
+    mqPutMsg          - Put a message to an open queue using MQPUT
      mqInquireErrorLog - Retrieve error log entries using PCF
 */
 
@@ -249,6 +250,31 @@ int mqCloseQueue (mqconn_t *conn, MQHOBJ *hObj)
       break;
     default:
       fprintf (stderr, "MQCLOSE failed: CC=%d RC=%d %s\n",
+               (int) cc, (int) rc, mqrc2str (rc));
+      break;
+  }
+
+  return rc;
+}
+
+
+/******************************************************************************/
+/* Put a message to an open queue.                                            */
+/******************************************************************************/
+int mqPutMsg (mqconn_t *conn, MQHOBJ hObj, const void *msg, MQLONG msgLen)
+{
+  MQMD   md  = {MQMD_DEFAULT};
+  MQPMO  pmo = {MQPMO_DEFAULT};
+  MQLONG cc, rc;
+
+  MQPUT (conn->hConn, hObj, &md, &pmo, msgLen, msg, &cc, &rc);
+
+  switch (rc)
+  {
+    case MQRC_NONE:
+      break;
+    default:
+      fprintf (stderr, "MQPUT failed: CC=%d RC=%d %s\n",
                (int) cc, (int) rc, mqrc2str (rc));
       break;
   }

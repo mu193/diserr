@@ -12,6 +12,7 @@
      mqDisconnect       - Disconnect from a queue manager
      mqOpenQueue        - Open a queue
      mqCloseQueue       - Close a queue opened with mqOpenQueue
+    mqPutMsg           - Put a message to an open queue
      mqInquireErrorLog  - Inquire error log entries from queue manager
 */
 
@@ -53,6 +54,8 @@ int         mqOpenQueue        (mqconn_t *conn, const char *qName,
                                 const char *rQmgr, MQLONG options,
                                 MQHOBJ *hObj);
 int         mqCloseQueue       (mqconn_t *conn, MQHOBJ *hObj);
+int         mqPutMsg           (mqconn_t *conn, MQHOBJ hObj,
+                                const void *msg, MQLONG msgLen);
 int         mqInquireErrorLog  (mqconn_t *conn);
 
 #endif /* MQUTIL_H */
