@@ -8,6 +8,7 @@
 
    Functions:
      addQmgr - register a queue manager in the daemon configuration
+     listQmgr - list queue-manager entries from daemon configuration
 */
 
 #ifndef MQLOGCTL_H
@@ -73,5 +74,6 @@ typedef struct
 /******************************************************************************/
 
 int addQmgr (mqconn_t *conn);
+int listQmgr (mqconn_t *conn);
 
 #endif /* MQLOGCTL_H */

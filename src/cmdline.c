@@ -67,6 +67,7 @@ void cmdlInit (void)
   args.remQmgr   = NULL;      // remote qmgr name for PCF execution (-r)
   args.nodeQmgr  = NULL;      // qmgr name to add to daemon configuration
   args.config    = 0;         // daemon configuration enabled (--config)
+  args.list      = 0;         // list daemon configuration entries (--list)
   args.output    = strdup ("stdout"); // output destination (-o)
   args.daemon    = 0;         // daemon mode (-d)
   args.verbose   = 0;         // print all selectors (-v)
@@ -100,6 +101,7 @@ int cmdlParse (int argc, char *argv[])
     {"daemon",      no_argument,       0, 'd'},
     {"config",      no_argument,       0, 1100},
     {"add-qmgr",    required_argument, 0, 1101},
+    {"list",        no_argument,       0, 1102},
     {"help",        no_argument,       0, 'h'},
     {"verbose",     no_argument,       0, 'v'},
     {"print-time",  no_argument,       0, 1001},
@@ -278,6 +280,18 @@ int cmdlParse (int argc, char *argv[])
         break;
 
       // ---------------------------------------------------
+      // List daemon configuration entries (--list)
+      // ---------------------------------------------------
+      case 1102:
+        if (!args.config)
+        {
+          fprintf (stderr, "Error: --list requires --config\n");
+          goto _door_error;
+        }
+        args.list = 1;
+        break;
+
+      // ---------------------------------------------------
       // Verbose mode (-v)
       // ---------------------------------------------------
       case 'v':
@@ -352,6 +366,7 @@ void cmdlUsage (const char *progname)
   printf ("  -d, --daemon               Collect data from all configured remote queue managers\n");
   printf ("      --config                Enable daemon configuration mode\n");
   printf ("      --add-qmgr     <name>   Add queue manager to daemon configuration (requires --config)\n");
+  printf ("      --list                  List queue managers from daemon configuration (requires --config)\n");
   printf ("  -v, --verbose              Print all PCF selectors (default: log records only)\n");
   printf ("      --print-time           Print timestamp with each log entry\n");
   printf ("      --version              Print version information\n");

@@ -15,8 +15,10 @@
      -t, --timeStamp   <iso>   Show entries after ISO 8601 timestamp
      -f, --format      <fmt>   Output format: text (default) or json
      -o, --output      <dest>  Output destination: stdout or a file name
-      -d, --daemon              Collect data from all configured remote queue managers
-       --add-qmgr    <name>   Add queue manager to daemon configuration
+     -d, --daemon              Collect data from all configured remote queue managers
+     --config                  Enable daemon configuration mode
+       --add-qmgr      <name>  Add queue manager to daemon configuration
+       --list                  List queue managers from daemon configuration
      -v, --verbose             Print all PCF selectors (default: log records only)
          --print-time          Print timestamp with each log entry
      -h, --help                Display this help message
@@ -108,6 +110,22 @@ int main (int argc, char *argv[])
       goto _door_error;
     }
     rc = addQmgr (&conn);
+    if (rc)
+      goto _door_error;
+    goto _door_ok;
+  }
+
+  // -------------------------------------------------------
+  // List daemon configuration entries if requested.
+  // -------------------------------------------------------
+  if (args.list)
+  {
+    if (!args.config)
+    {
+      fprintf (stderr, "Error: --list requires --config\n");
+      goto _door_error;
+    }
+    rc = listQmgr (&conn);
     if (rc)
       goto _door_error;
     goto _door_ok;

@@ -50,6 +50,7 @@ typedef struct
   char       *remQmgr;    // remote queue manager name (-r) for PCF execution
   char       *nodeQmgr;   // queue manager name to add to daemon configuration
   int         config;     // daemon configuration enabled (--config)
+  int         list;       // list daemon configuration entries (--list)
   char       *output;     // output destination (-o): stdout or file name
   int         daemon;     // daemon mode (-d): collect all configured remote qmgrs
   int         verbose;    // verbose output (-v): print all selectors
