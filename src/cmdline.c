@@ -38,6 +38,7 @@
 #include <string.h>
 #include <time.h>
 #include <getopt.h>
+#include <cmqc.h>
 #include "cmdline.h"
 
 /******************************************************************************/
@@ -52,6 +53,7 @@ cmdline_t args;
 /******************************************************************************/
 
 static int cmdlNormalizeIsoTime (const char *ts, char *buf, size_t bufLen);
+static int cmdlValidateQmgrName (const char *value, const char *optName);
 
 /******************************************************************************/
 /* Initialize command line arguments structure with default values.           */
@@ -63,7 +65,8 @@ void cmdlInit (void)
   args.logFile   = NULL;      // error log file name (-l)
   args.timeStamp = NULL;      // ISO 8601 timestamp for filtering (-t)
   args.remQmgr   = NULL;      // remote qmgr name for PCF execution (-r)
-  args.addQmgr   = NULL;      // qmgr name to add to daemon configuration
+  args.nodeQmgr  = NULL;      // qmgr name to add to daemon configuration
+  args.config    = 0;         // daemon configuration enabled (--config)
   args.output    = strdup ("stdout"); // output destination (-o)
   args.daemon    = 0;         // daemon mode (-d)
   args.verbose   = 0;         // print all selectors (-v)
@@ -95,7 +98,8 @@ int cmdlParse (int argc, char *argv[])
     {"format",      required_argument, 0, 'f'},
     {"output",      required_argument, 0, 'o'},
     {"daemon",      no_argument,       0, 'd'},
-    {"add-qmgr",    required_argument, 0, 1003},
+    {"config",      no_argument,       0, 1100},
+    {"add-qmgr",    required_argument, 0, 1101},
     {"help",        no_argument,       0, 'h'},
     {"verbose",     no_argument,       0, 'v'},
     {"print-time",  no_argument,       0, 1001},
@@ -121,6 +125,8 @@ int cmdlParse (int argc, char *argv[])
           fprintf (stderr, "Error: -m and -c are mutually exclusive\n"); 
           goto _door_error; 
         }
+        if (cmdlValidateQmgrName (optarg, "--qmgr") != 0)
+          goto _door_error;
         args.qmgr     = strdup (optarg);
         args.connType = BINDING;
         if (args.qmgr == NULL)
@@ -140,6 +146,8 @@ int cmdlParse (int argc, char *argv[])
           fprintf (stderr, "Error: -m and -c are mutually exclusive\n");
           goto _door_error;
         }
+        if (cmdlValidateQmgrName (optarg, "--client") != 0)
+          goto _door_error;
         args.qmgr     = strdup (optarg);
         args.connType = CLIENT;
         if (args.qmgr == NULL)
@@ -154,6 +162,8 @@ int cmdlParse (int argc, char *argv[])
       //   sets args.remQmgr
       // ---------------------------------------------------
       case 'r':
+        if (cmdlValidateQmgrName (optarg, "--remQmgr") != 0)
+          goto _door_error;
         args.remQmgr = strdup (optarg);
         if (args.remQmgr == NULL)
         {
@@ -242,11 +252,25 @@ int cmdlParse (int argc, char *argv[])
         break;
 
       // ---------------------------------------------------
+      // Configuration flag (--config)
+      // ---------------------------------------------------
+      case 1100:
+        args.config = 1;
+        break;
+
+      // ---------------------------------------------------
       // Add queue manager to daemon configuration (--add-qmgr)
       // ---------------------------------------------------
-      case 1003:
-        args.addQmgr = strdup (optarg);
-        if (args.addQmgr == NULL)
+      case 1101:
+        if (!args.config)
+        {
+          fprintf (stderr, "Error: --add-qmgr requires --config\n");
+          goto _door_error;
+        }
+        if (cmdlValidateQmgrName (optarg, "--add-qmgr") != 0)
+          goto _door_error;
+        args.nodeQmgr = strdup (optarg);
+        if (args.nodeQmgr == NULL)
         {
           fprintf (stderr, "Error: Memory allocation failed\n");
           goto _door_error;
@@ -326,7 +350,8 @@ void cmdlUsage (const char *progname)
   printf ("  -f, --format      <fmt>    Output format: text (default) or json\n");
   printf ("  -o, --output      <dest>   Output destination: stdout or a file name\n");
   printf ("  -d, --daemon               Collect data from all configured remote queue managers\n");
-  printf ("      --add-qmgr    <name>   Add queue manager to daemon configuration\n");
+  printf ("      --config                Enable daemon configuration mode\n");
+  printf ("      --add-qmgr     <name>   Add queue manager to daemon configuration (requires --config)\n");
   printf ("  -v, --verbose              Print all PCF selectors (default: log records only)\n");
   printf ("      --print-time           Print timestamp with each log entry\n");
   printf ("      --version              Print version information\n");
@@ -381,17 +406,33 @@ void cmdlCleanup (void)
     args.remQmgr = NULL;
   }
 
-  if (args.addQmgr != NULL)
+  if (args.nodeQmgr != NULL)
   {
-    free (args.addQmgr);
-    args.addQmgr = NULL;
+    free (args.nodeQmgr);
+    args.nodeQmgr = NULL;
   }
+
 
   if (args.output != NULL)
   {
     free (args.output);
     args.output = NULL;
   }
+}
+
+/******************************************************************************/
+/* Validate queue-manager name length against MQ fixed-size fields.           */
+/******************************************************************************/
+static int cmdlValidateQmgrName (const char *value, const char *optName)
+{
+  if (strlen (value) > MQ_Q_MGR_NAME_LENGTH)
+  {
+    fprintf (stderr,
+             "Error: %s value exceeds MQ_Q_MGR_NAME_LENGTH (%d)\n",
+             optName, MQ_Q_MGR_NAME_LENGTH);
+    return -1;
+  }
+  return 0;
 }
 
 /******************************************************************************/
@@ -539,4 +580,3 @@ static int cmdlNormalizeIsoTime(const char *ts    , // input timestamp string
   snprintf (buf + 19, bufLen - 19, ".%03dZ", ms);
   return 0;
 }
-

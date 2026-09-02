@@ -261,7 +261,7 @@ int mqCloseQueue (mqconn_t *conn, MQHOBJ *hObj)
 /******************************************************************************/
 /* Put a message to an open queue.                                            */
 /******************************************************************************/
-int mqPutMsg (mqconn_t *conn, MQHOBJ hObj, const void *msg, MQLONG msgLen)
+int mqPutMsg (mqconn_t *conn, MQHOBJ hObj, void *msg, MQLONG msgLen)
 {
   MQMD   md  = {MQMD_DEFAULT};
   MQPMO  pmo = {MQPMO_DEFAULT};

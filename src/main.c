@@ -46,7 +46,6 @@
 
 int foreground (mqconn_t *conn);
 int daemonize  (mqconn_t *conn);
-int addQmgr    (mqconn_t *conn);
 
 int main (int argc, char *argv[])
 {
@@ -101,8 +100,13 @@ int main (int argc, char *argv[])
   // -------------------------------------------------------
   // Handle adding a new queue manager if requested.
   // -------------------------------------------------------
-  if (args.addQmgr != NULL)
+  if (args.nodeQmgr != NULL)
   {
+    if (!args.config)
+    {
+      fprintf (stderr, "Error: --add-qmgr requires --config\n");
+      goto _door_error;
+    }
     rc = addQmgr (&conn);
     if (rc)
       goto _door_error;
@@ -208,7 +212,7 @@ int daemonize (mqconn_t *conn)
   // open control queue.
   // -------------------------------------------------------
   mqrc = mqOpenQueue( conn              ,
-                      MQ_DISERR_CTRL    ,
+                      MQ_DISERR_CTRL_QUEUE,
                       NULL              ,
                       MQOO_INPUT_SHARED | MQOO_OUTPUT          |\
                       MQOO_BROWSE       | MQOO_FAIL_IF_QUIESCING,
@@ -222,53 +226,6 @@ int daemonize (mqconn_t *conn)
       rc = -1;
       goto _door;
   }
-
-  // -------------------------------------------------------
-  // Close control queue.
-  // -------------------------------------------------------
-  mqrc = mqCloseQueue (conn, &hCtrlQ);
-  switch (mqrc)
-  {
-    case MQRC_NONE:   // Success - continue.
-      break;          //
-    default:          // Error - exit with failure.
-      rc = -1;
-      goto _door;
-  }
-
-  _door:
-
-  return rc;
-}
-
-/******************************************************************************/
-/* Add queue manager to daemon configuration.                                 */
-/******************************************************************************/
-int addQmgr (mqconn_t *conn)
-{
-  MQHOBJ hCtrlQ = MQHO_NONE;
-  int mqrc;
-  int rc = 0;
-
-  // -------------------------------------------------------
-  // open control queue for put.
-  // -------------------------------------------------------
-  mqrc = mqOpenQueue( conn              ,
-                      MQ_DISERR_CTRL    ,
-                      NULL              ,
-                      MQOO_OUTPUT       | MQOO_FAIL_IF_QUIESCING,
-                      &hCtrlQ          );
-
-  switch( mqrc )
-  {
-    case MQRC_NONE:   // Success - continue.
-      break;          //
-    default:          // Error - exit with failure.
-      rc = -1;
-      goto _door;
-  }
-
-// call mqPutMsg which is a new not tested function
 
   // -------------------------------------------------------
   // Close control queue.
