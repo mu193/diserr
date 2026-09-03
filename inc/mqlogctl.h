@@ -23,9 +23,10 @@
 /******************************************************************************/
 
 // ---------------------------------------------------------
-// MQ error log control Queue name	
+// MQ error log control Queue name	& properties
 // ---------------------------------------------------------
-#define MQ_DISERR_CTRL_QUEUE "MONITOR.DISERR.CONTROL"
+#define MQ_DISERR_CTRL_QUEUE       "MONITOR.DISERR.CONTROL"
+#define MQ_DISERR_CTRL_MSG_EXPIRY   30  // Message expiry in days
 
 // ---------------------------------------------------------
 // MQ log item lengths

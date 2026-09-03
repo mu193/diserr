@@ -28,6 +28,7 @@
 #include <cmqbc.h>
 #include "cmdline.h"
 #include "mqconvert.h"
+#include "mqlogctl.h"
 #include "osutil.h"
 #include "mqreason.h"
 #include "mqutil.h"
@@ -266,6 +267,9 @@ int mqPutMsg (mqconn_t *conn, MQHOBJ hObj, void *msg, MQLONG msgLen)
   MQMD   md  = {MQMD_DEFAULT};
   MQPMO  pmo = {MQPMO_DEFAULT};
   MQLONG cc, rc;
+
+  // MQMD.Expiry is in tenths of a second; MQ_DISERR_CTRL_MSG_EXPIRY is in days.
+  md.Expiry = MQ_DISERR_CTRL_MSG_EXPIRY * 24 * 60 * 60 * 10;
 
   MQPUT (conn->hConn, hObj, &md, &pmo, msgLen, msg, &cc, &rc);
 
