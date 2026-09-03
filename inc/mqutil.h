@@ -56,6 +56,6 @@ int         mqOpenQueue        (mqconn_t *conn, const char *qName,
 int         mqCloseQueue       (mqconn_t *conn, MQHOBJ *hObj);
 int         mqPutMsg           (mqconn_t *conn, MQHOBJ hObj,
                                 void *msg, MQLONG msgLen);
-int         mqInquireErrorLog  (mqconn_t *conn);
+int         mqInquireErrorLog  (mqconn_t *conn, const char *qmgr);
 
 #endif /* MQUTIL_H */

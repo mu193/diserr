@@ -7,8 +7,10 @@
      mqlogctl_t - Structure holding log-control request data
 
    Functions:
-     addQmgr - register a queue manager in the daemon configuration
-     listQmgr - list queue-manager entries from daemon configuration
+     addQmgr    - register a queue manager in the daemon configuration
+     listQmgr   - list queue-manager entries from daemon configuration
+     foreground - run in foreground mode
+     daemonize  - run in daemon mode
 */
 
 #ifndef MQLOGCTL_H
@@ -76,5 +78,7 @@ typedef struct
 
 int addQmgr (mqconn_t *conn);
 int listQmgr (mqconn_t *conn);
+int foreground (mqconn_t *conn);
+int daemonize  (mqconn_t *conn);
 
 #endif /* MQLOGCTL_H */

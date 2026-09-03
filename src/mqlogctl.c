@@ -4,9 +4,20 @@
    queue-manager error log files.
 
    Functions:
-     addQmgr - register a queue manager in the daemon configuration
-     listQmgr - list queue-manager entries from daemon configuration
+     addQmgr    - register a queue manager in the daemon configuration
+     listQmgr   - list queue-manager entries from daemon configuration
+     foreground - run in foreground mode
+     daemonize  - run in daemon mode
 */
+
+/******************************************************************************/
+/*                                D E F I N E S                               */
+/******************************************************************************/
+
+// -------------------------------------
+// compiler features 
+// -------------------------------------
+#define _POSIX_C_SOURCE 200809L  // fileno, fdopen, dup
 
 /******************************************************************************/
 /*                               I N C L U D E S                              */
@@ -14,7 +25,9 @@
 #include "mqlogctl.h"
 #include "cmdline.h"
 #include "mqreason.h"
+#include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 
 /******************************************************************************/
 /*                                                                            */
@@ -217,4 +230,139 @@ int listQmgr (mqconn_t *conn)
   if (hCtrlQ != MQHO_NONE && mqCloseQueue (conn, &hCtrlQ) != MQRC_NONE)
     sysRc = -1;
   return sysRc;
+}
+
+/******************************************************************************/
+/* Run in foreground mode.                                                    */
+/******************************************************************************/
+int foreground (mqconn_t *conn)
+{
+  int rc;
+
+  // -------------------------------------------------------
+  // Save the real stdout before possibly redirecting it to
+  // a file with -o/--output, so --print-time can still write
+  // timestamps to the terminal instead of the output file.
+  // -------------------------------------------------------
+  gRealStdout = fdopen (dup (fileno (stdout)), "w");
+  if (gRealStdout == NULL)
+  {
+    fprintf (stderr, "Error: cannot duplicate stdout\n");
+    rc = -1;
+    goto _door;
+  }
+
+  if (strcmp (args.output, "stdout") != 0
+      && freopen (args.output, "a", stdout) == NULL)
+  {
+    fprintf (stderr, "Error: cannot open output file '%s'\n", args.output);
+    rc = -1;
+    goto _door;
+  }
+
+  // -------------------------------------------------------
+  // Inquire error log.
+  // args.remQmgr is NULL/"" when -r/--remQmgr was not given,
+  // in which case mqInquireErrorLog targets whichever queue
+  // manager 'conn' is already connected to (the local one).
+  // -------------------------------------------------------
+  rc = mqInquireErrorLog (conn, args.remQmgr);
+  switch (rc)
+  {
+    case 0:           // Success - continue.
+      break;          //
+    default:          // Error - exit with failure.
+      rc = -1;
+      goto _door;
+  }
+
+  _door:
+
+  return rc;
+}
+
+/******************************************************************************/
+/* Run in daemon mode.                                                        */
+/******************************************************************************/
+int daemonize (mqconn_t *conn)
+{
+  MQHOBJ hCtrlQ = MQHO_NONE;
+  int mqrc;
+  int rc = 0;
+
+  // -------------------------------------------------------
+  // open control queue.
+  // -------------------------------------------------------
+  mqrc = mqOpenQueue( conn              ,
+                      MQ_DISERR_CTRL_QUEUE,
+                      NULL              ,
+                      MQOO_INPUT_SHARED | MQOO_OUTPUT          |\
+                      MQOO_BROWSE       | MQOO_FAIL_IF_QUIESCING,
+                      &hCtrlQ          );
+
+  switch( mqrc )
+  {
+    case MQRC_NONE:   // Success - continue.
+      break;          //
+    default:          // Error - exit with failure.
+      rc = -1;
+      goto _door;
+  }
+
+  // -------------------------------------------------------
+  // browse first message in the control queue 
+  // -------------------------------------------------------
+  MQMD md = {MQMD_DEFAULT};
+  MQGMO gmo = {MQGMO_DEFAULT};
+  MQLONG mqcc, dataLen;
+
+  gmo.Options = MQGMO_BROWSE_FIRST | MQGMO_FAIL_IF_QUIESCING;
+
+  mqlogctl_t ctrlMsg = MQLOGCTL_DEFAULT;
+
+  MQGET (conn->hConn, hCtrlQ, &md, &gmo,
+         sizeof (ctrlMsg), &ctrlMsg, &dataLen, &mqcc, &mqrc);
+
+  switch (mqrc)
+  {
+    case MQRC_NONE:            // Success - continue.
+      break;                   //
+    case MQRC_NO_MSG_AVAILABLE: // No message - continue.
+      break;                   //
+    default:                   // Error - exit with failure.
+      fprintf (stderr, "MQGET browse failed: CC=%d RC=%d %s\n", (int) mqcc, (int) mqrc, mqrc2str (mqrc));
+      rc = -1;
+      goto _door;
+  }
+  
+  // -------------------------------------------------------
+  // inquire logs on queue manager in control message
+  // -------------------------------------------------------
+  mqrc = mqInquireErrorLog (conn, ctrlMsg.qmgr);
+  if (mqrc != MQRC_NONE)
+    rc = -1;
+
+/* to be improved
+  - if last time is not set -> initial run 
+    |-> get amqerr3, amqerr1 and amqerr1 
+  - output in json
+  - redirect to a log file
+*/
+
+  // -------------------------------------------------------
+  // Close control queue.
+  // -------------------------------------------------------
+  mqrc = mqCloseQueue (conn, &hCtrlQ);
+  switch (mqrc)
+  {
+    case MQRC_NONE:   // Success - continue.
+      break;          //
+    default:          // Error - exit with failure.
+      rc = -1;
+      goto _door;
+  }
+
+  _door:
+
+  return rc;
 }

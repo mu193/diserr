@@ -26,15 +26,6 @@
 */
 
 /******************************************************************************/
-/*                                D E F I N E S                               */
-/******************************************************************************/
-
-// -------------------------------------
-// compiler features 
-// -------------------------------------
-#define _POSIX_C_SOURCE 200809L  // fileno, fdopen, dup
-
-/******************************************************************************/
 /*                               I N C L U D E S                              */
 /******************************************************************************/
 #include <stdio.h>
@@ -43,11 +34,9 @@
 #include <unistd.h>
 #include "cmdline.h"
 #include "mqlogctl.h"
+#include "mqreason.h"
 #include "mqutil.h"
 #include "version.h"
-
-int foreground (mqconn_t *conn);
-int daemonize  (mqconn_t *conn);
 
 int main (int argc, char *argv[])
 {
@@ -169,96 +158,4 @@ int main (int argc, char *argv[])
     cmdlCleanup ();
     return EXIT_FAILURE;
 
-}
-
-/******************************************************************************/
-/* Run in foreground mode.                                                    */
-/******************************************************************************/
-int foreground (mqconn_t *conn)
-{
-  int rc;
-
-  // -------------------------------------------------------
-  // Save the real stdout before possibly redirecting it to
-  // a file with -o/--output, so --print-time can still write
-  // timestamps to the terminal instead of the output file.
-  // -------------------------------------------------------
-  gRealStdout = fdopen (dup (fileno (stdout)), "w");
-  if (gRealStdout == NULL)
-  {
-    fprintf (stderr, "Error: cannot duplicate stdout\n");
-    rc = -1;
-    goto _door;
-  }
-
-  if (strcmp (args.output, "stdout") != 0
-      && freopen (args.output, "a", stdout) == NULL)
-  {
-    fprintf (stderr, "Error: cannot open output file '%s'\n", args.output);
-    rc = -1;
-    goto _door;
-  }
-
-  // -------------------------------------------------------
-  // Inquire error log.
-  // -------------------------------------------------------
-  rc = mqInquireErrorLog (conn);
-  switch (rc)
-  {
-    case 0:           // Success - continue.
-      break;          //
-    default:          // Error - exit with failure.
-      rc = -1;
-      goto _door;
-  }
-
-  _door:
-
-  return rc;
-}
-
-/******************************************************************************/
-/* Run in daemon mode.                                                        */
-/******************************************************************************/
-int daemonize (mqconn_t *conn)
-{
-  MQHOBJ hCtrlQ = MQHO_NONE;
-  int mqrc;
-  int rc = 0;
-
-  // -------------------------------------------------------
-  // open control queue.
-  // -------------------------------------------------------
-  mqrc = mqOpenQueue( conn              ,
-                      MQ_DISERR_CTRL_QUEUE,
-                      NULL              ,
-                      MQOO_INPUT_SHARED | MQOO_OUTPUT          |\
-                      MQOO_BROWSE       | MQOO_FAIL_IF_QUIESCING,
-                      &hCtrlQ          );
-
-  switch( mqrc )
-  {
-    case MQRC_NONE:   // Success - continue.
-      break;          //
-    default:          // Error - exit with failure.
-      rc = -1;
-      goto _door;
-  }
-
-  // -------------------------------------------------------
-  // Close control queue.
-  // -------------------------------------------------------
-  mqrc = mqCloseQueue (conn, &hCtrlQ);
-  switch (mqrc)
-  {
-    case MQRC_NONE:   // Success - continue.
-      break;          //
-    default:          // Error - exit with failure.
-      rc = -1;
-      goto _door;
-  }
-
-  _door:
-
-  return rc;
 }

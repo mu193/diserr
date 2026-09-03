@@ -290,7 +290,7 @@ int mqPutMsg (mqconn_t *conn, MQHOBJ hObj, void *msg, MQLONG msgLen)
 /******************************************************************************/
 /* Inquire error log entries from the queue manager via MQAI Bags.            */
 /******************************************************************************/
-int mqInquireErrorLog (mqconn_t *conn)
+int mqInquireErrorLog (mqconn_t *conn, const char *qmgr)
 {
 
   // -------------------------------------------------------
@@ -393,12 +393,12 @@ int mqInquireErrorLog (mqconn_t *conn)
   MQHOBJ hReplyQ = MQHO_NONE;
   MQLONG adminQOptions = MQOO_OUTPUT | MQOO_FAIL_IF_QUIESCING;
 
-  if (args.remQmgr == NULL || strlen (args.remQmgr) == 0)
+  if (qmgr == NULL || strlen (qmgr) == 0)
     adminQOptions |= MQOO_INQUIRE;
 
   if (mqOpenQueue( conn                  ,
                    MQ_ADMIN_COMMAND_QUEUE, 
-                   args.remQmgr          ,
+                   qmgr                  ,
                    adminQOptions         ,
                    &hAdminQ              ) != MQRC_NONE )
   {
