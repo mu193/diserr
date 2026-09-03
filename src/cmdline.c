@@ -9,6 +9,7 @@
      cmdlParse             - Parse command line arguments from argc/argv
      cmdlUsage             - Display usage information to stdout
      cmdlCleanup           - Free allocated memory in arguments structure
+     cmdlValidateQmgrName  - Validate a queue manager name argument (static)
      cmdlNormalizeIsoTime  - Validate and normalize ISO 8601 timestamp to
                              yyyy-mm-ddThh:mm:ss.sssZ (static)
 */

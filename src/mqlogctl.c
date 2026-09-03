@@ -70,15 +70,16 @@ int addQmgr (mqconn_t *conn)
     mqlogctl_t ctrlMsg = MQLOGCTL_DEFAULT;
     MQLONG dataLen = 0;
 
-    MQGET (conn->hConn, hCtrlQ, &md, &gmo,
-           sizeof (ctrlMsg), &ctrlMsg, &dataLen, &mqcc, &mqrc);
+    MQGET( conn->hConn, hCtrlQ, &md, &gmo,
+           sizeof (ctrlMsg), &ctrlMsg, &dataLen, &mqcc, &mqrc );
 
-    if (mqrc == MQRC_NO_MSG_AVAILABLE)
+    if( mqrc == MQRC_NO_MSG_AVAILABLE )
       break;
 
     if (mqrc != MQRC_NONE)
     {
-      fprintf (stderr, "MQGET browse failed: CC=%d RC=%d %s\n", (int) mqcc, (int) mqrc, mqrc2str (mqrc));
+      fprintf (stderr, "MQGET browse failed: CC=%d RC=%d %s\n", (int) mqcc, 
+                                                                (int) mqrc, mqrc2str (mqrc));
       rc = -1;
       goto _door;
     }
@@ -114,6 +115,7 @@ int addQmgr (mqconn_t *conn)
   _door:
   if (hCtrlQ != MQHO_NONE && mqCloseQueue (conn, &hCtrlQ) != MQRC_NONE)
     rc = -1;
+
   return rc;
 }
 
@@ -144,8 +146,7 @@ int listQmgr (mqconn_t *conn)
   MQGMO gmo = {MQGMO_DEFAULT};
   gmo.Options = MQGMO_BROWSE_FIRST | MQGMO_FAIL_IF_QUIESCING;
 
-  int itemCount;
-  for( itemCount = 1; ; itemCount++)
+  for( int itemCount = 1; ; itemCount++)
   {
     // reset MsgId/CorrelId each call, else BROWSE_NEXT tries to match the previous message.
     MQMD md = {MQMD_DEFAULT};
