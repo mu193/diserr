@@ -21,6 +21,7 @@
 
 #include <stdio.h>
 #include <cmqc.h>
+#include "cmdline.h"
 
 /******************************************************************************/
 /*                               T Y P E S                                    */
@@ -56,6 +57,11 @@ int         mqOpenQueue        (mqconn_t *conn, const char *qName,
 int         mqCloseQueue       (mqconn_t *conn, MQHOBJ *hObj);
 int         mqPutMsg           (mqconn_t *conn, MQHOBJ hObj,
                                 void *msg, MQLONG msgLen);
-int         mqInquireErrorLog  (mqconn_t *conn, const char *qmgr);
+int         mqInquireErrorLog  (mqconn_t    *conn        , // connection handler
+                                const char *qmgr        , // qmgr name
+                                const char *logFile     , // log file name
+                                const char *firstTime   , // timestamp to filter logs after
+                                formatType_t format      , // output format: text or json
+                                      char *lastTime    ); // returns the last log entry time in ISO format
 
 #endif /* MQUTIL_H */

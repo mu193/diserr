@@ -28,6 +28,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <stdio.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 /******************************************************************************/
 /*                                                                            */
@@ -266,7 +269,10 @@ int foreground (mqconn_t *conn)
   // in which case mqInquireErrorLog targets whichever queue
   // manager 'conn' is already connected to (the local one).
   // -------------------------------------------------------
-  rc = mqInquireErrorLog (conn, args.remQmgr);
+  rc = mqInquireErrorLog (conn, args.remQmgr,
+                          args.logFile, args.timeStamp,
+                          args.format,
+                          NULL);
   switch (rc)
   {
     case 0:           // Success - continue.
@@ -291,6 +297,17 @@ int daemonize (mqconn_t *conn)
   int rc = 0;
 
   // -------------------------------------------------------
+  // Redirect normal output to the daemon log file.
+  // -------------------------------------------------------
+  gRealStdout = fdopen (dup (fileno (stdout)), "w");
+  if (gRealStdout == NULL)
+  {
+    fprintf (stderr, "Error: cannot duplicate stdout\n");
+    rc = -1;
+    goto _door;
+  }
+
+  // -------------------------------------------------------
   // open control queue.
   // -------------------------------------------------------
   mqrc = mqOpenQueue( conn              ,
@@ -309,38 +326,83 @@ int daemonize (mqconn_t *conn)
       goto _door;
   }
 
-  // -------------------------------------------------------
-  // browse first message in the control queue 
-  // -------------------------------------------------------
-  MQMD md = {MQMD_DEFAULT};
-  MQGMO gmo = {MQGMO_DEFAULT};
-  MQLONG mqcc, dataLen;
-
-  gmo.Options = MQGMO_BROWSE_FIRST | MQGMO_FAIL_IF_QUIESCING;
-
-  mqlogctl_t ctrlMsg = MQLOGCTL_DEFAULT;
-
-  MQGET (conn->hConn, hCtrlQ, &md, &gmo,
-         sizeof (ctrlMsg), &ctrlMsg, &dataLen, &mqcc, &mqrc);
-
-  switch (mqrc)
+  while (1)
   {
-    case MQRC_NONE:            // Success - continue.
-      break;                   //
-    case MQRC_NO_MSG_AVAILABLE: // No message - continue.
-      break;                   //
-    default:                   // Error - exit with failure.
-      fprintf (stderr, "MQGET browse failed: CC=%d RC=%d %s\n", (int) mqcc, (int) mqrc, mqrc2str (mqrc));
+    // -----------------------------------------------------
+    // browse first message in the control queue 
+    // -----------------------------------------------------
+    MQMD md = {MQMD_DEFAULT};
+    MQGMO gmo = {MQGMO_DEFAULT};
+    MQLONG mqcc, dataLen;
+  
+    char amqerrFile[MQLOGCTL_LOG_FILENAME_LEN + 1];
+
+    gmo.Options = MQGMO_BROWSE_FIRST | MQGMO_FAIL_IF_QUIESCING;
+  
+    mqlogctl_t ctrlMsg = MQLOGCTL_DEFAULT;
+  
+    MQGET (conn->hConn, hCtrlQ, &md, &gmo,
+           sizeof (ctrlMsg), &ctrlMsg, &dataLen, &mqcc, &mqrc);
+  
+    switch (mqrc)
+    {
+      case MQRC_NONE:            // Success - continue.
+        break;                   //
+      case MQRC_NO_MSG_AVAILABLE: // No message - continue.
+        break;                   //
+      default:                   // Error - exit with failure.
+        fprintf (stderr, "MQGET browse failed: CC=%d RC=%d %s\n", (int) mqcc, (int) mqrc, mqrc2str (mqrc));
+        rc = -1;
+        goto _door;
+    }
+    
+    // -----------------------------------------------------
+    // inquire logs on queue manager in control message
+    // -----------------------------------------------------
+    char nodeQmgr[MQ_Q_MGR_NAME_LENGTH + 1];
+    size_t qmgrLen = strnlen (ctrlMsg.qmgr, sizeof (nodeQmgr));
+    while (qmgrLen > 0 && ctrlMsg.qmgr[qmgrLen - 1] == ' ')
+      qmgrLen--;
+    snprintf (nodeQmgr, sizeof (nodeQmgr), "%.*s", (int) qmgrLen, ctrlMsg.qmgr);
+
+    char outputLogPath[256];
+    snprintf (outputLogPath, sizeof (outputLogPath), "/tmp/amqerr.%s.json",
+              nodeQmgr[0] != '\0' ? nodeQmgr : "default");
+
+    if (freopen (outputLogPath, "a", stdout) == NULL)
+    {
+      fprintf (stderr, "Error: cannot open daemon log file '%s'\n", outputLogPath);
       rc = -1;
       goto _door;
-  }
-  
-  // -------------------------------------------------------
-  // inquire logs on queue manager in control message
-  // -------------------------------------------------------
-  mqrc = mqInquireErrorLog (conn, ctrlMsg.qmgr);
-  if (mqrc != MQRC_NONE)
-    rc = -1;
+    }
+
+    // -----------------------------------------------------
+    // Initial run - last log entry is not set.
+    // Get amqerr3, amqerr2 and amqerr1
+    // and last log entry time
+    // -----------------------------------------------------
+    if( ctrlMsg.lastLogEntry[0] == '\0' )
+    {
+      for(int i = 3; i > 0; i--)
+      {
+        sprintf(amqerrFile, "AMQERR0%d", i);
+        mqrc = mqInquireErrorLog( conn         , 
+                                  ctrlMsg.qmgr , 
+                                  amqerrFile   , 
+                                  NULL         ,
+                                  FMT_JSON     ,
+                                  ctrlMsg.lastLogEntry );
+        if (mqrc != MQRC_NONE)
+        {
+          rc = -1;
+          break;
+        }
+      }
+      // consume a message identified by md->correlationId 
+      // put message with new controlStruct back to the control q 
+      // do both actions in a transactional manner 
+    }
+    fclose(gRealStdout);
 
 /* to be improved
   - if last time is not set -> initial run 
@@ -348,6 +410,7 @@ int daemonize (mqconn_t *conn)
   - output in json
   - redirect to a log file
 */
+  }
 
   // -------------------------------------------------------
   // Close control queue.

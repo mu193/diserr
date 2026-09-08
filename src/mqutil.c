@@ -290,21 +290,26 @@ int mqPutMsg (mqconn_t *conn, MQHOBJ hObj, void *msg, MQLONG msgLen)
 /******************************************************************************/
 /* Inquire error log entries from the queue manager via MQAI Bags.            */
 /******************************************************************************/
-int mqInquireErrorLog (mqconn_t *conn, const char *qmgr)
+int mqInquireErrorLog ( mqconn_t    *conn        , // connection handler
+                        const char *qmgr        , // qmgr name 
+                        const char *logFile     , // log file name
+                        const char *firstTime   , // timestamp to filter logs after
+                        formatType_t format      , // output format: text or json
+                              char *lastTime ) // returns the last log entry time in ISO format
 {
 
-  // -------------------------------------------------------
-  // Request parameters from command line args.
-  // -------------------------------------------------------
-  const MQCHAR *logName      = (args.logFile   != NULL) ? args.logFile   : "";
-  const MQCHAR *afterIsoTime = (args.timeStamp != NULL) ? args.timeStamp : "";
+  const MQCHAR *logName      = (logFile != NULL) ? logFile : "";
+  const MQCHAR *afterIsoTime = (firstTime != NULL) ? firstTime : "";
 
-  // timeStamp is already normalized to yyyy-mm-ddThh:mm:ss.sssZ by cmdlParse.
+  // firstTime is already normalized to yyyy-mm-ddThh:mm:ss.sssZ by cmdlParse.
 
   MQHBAG  cmdBag = MQHB_UNUSABLE_HBAG;
   MQHBAG  repBag = MQHB_UNUSABLE_HBAG;
   MQLONG  cc, rc;
   int     sysRc  = 0;
+
+  if (lastTime != NULL)
+    lastTime[0] = '\0';
 
   // -------------------------------------------------------
   // Create command bag.  
@@ -484,8 +489,8 @@ int mqInquireErrorLog (mqconn_t *conn, const char *qmgr)
         // No entries match the criteria - not an error.
         // -------------------------------------------------
         case MQRCCF_NONE_FOUND: 
-          fprintf (gRealStdout != NULL ? gRealStdout : stdout,
-                    "No error log entries found for the given criteria.\n");
+          fprintf( gRealStdout != NULL ? gRealStdout : stdout,
+                   "No error log entries found for the given criteria.\n" );
           sysRc = 0;
           break;
 
@@ -510,8 +515,7 @@ int mqInquireErrorLog (mqconn_t *conn, const char *qmgr)
     case MQRC_NONE:
       break;
     default:
-      fprintf (stderr, "mqCountItems failed: %d %s\n",
-               (int) rc, mqrc2str (rc));
+      fprintf (stderr, "mqCountItems failed: %d %s\n", (int) rc, mqrc2str (rc));
       sysRc = rc;
       goto _cleanup;
   }
@@ -567,7 +571,15 @@ int mqInquireErrorLog (mqconn_t *conn, const char *qmgr)
                      &cc                     ,
                      &rc                    );
 
-    switch (args.format)
+    if (rc == MQRC_NONE && lastTime != NULL)
+    {
+      size_t copyLen = (size_t) timeLen;
+      if (copyLen > MQLOGCTL_ISO_TIME_LEN)
+        copyLen = MQLOGCTL_ISO_TIME_LEN;
+      memcpy (lastTime, isotime, copyLen);
+    }
+
+    switch (format)
     {
       // ---------------------------------------------------
       // Output format: text 
