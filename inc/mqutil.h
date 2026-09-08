@@ -14,6 +14,7 @@
      mqCloseQueue       - Close a queue opened with mqOpenQueue
       mqPutMsg           - Put a message to an open queue
      mqInquireErrorLog  - Inquire error log entries from queue manager
+     mqUpdateCtrlMsg    - Replace a control message under syncpoint
 */
 
 #ifndef MQUTIL_H
@@ -63,5 +64,8 @@ int         mqInquireErrorLog  (mqconn_t    *conn        , // connection handler
                                 const char *firstTime   , // timestamp to filter logs after
                                 formatType_t format      , // output format: text or json
                                       char *lastTime    ); // returns the last log entry time in ISO format
+int         mqUpdateCtrlMsg    (mqconn_t *conn, MQHOBJ qObj,
+                                const MQMD *md,
+                                void *msg, MQLONG msgLen);
 
 #endif /* MQUTIL_H */

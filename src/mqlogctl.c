@@ -398,9 +398,25 @@ int daemonize (mqconn_t *conn)
           break;
         }
       }
-      // consume a message identified by md->correlationId 
-      // put message with new controlStruct back to the control q 
-      // do both actions in a transactional manner 
+
+      // ---------------------------------------------------
+      // consume a message identified by md->correlationId
+      // put message with new controlStruct back to the control q
+      // do both actions in a transactional manner
+      // ---------------------------------------------------
+      if (rc == 0)
+      {
+        mqrc = mqUpdateCtrlMsg (conn, hCtrlQ, &md, &ctrlMsg, sizeof (ctrlMsg));
+
+        switch (mqrc)
+        {
+          case MQRC_NONE:   // Success - continue.
+            break;          //
+          default:          // Error - exit with failure.
+            rc = -1;
+            break;
+        }
+      }
     }
     fclose(gRealStdout);
 

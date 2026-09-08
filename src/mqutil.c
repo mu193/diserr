@@ -12,6 +12,7 @@
      mqOpenQueue       - Open a queue using MQOPEN
      mqCloseQueue      - Close a queue opened with mqOpenQueue
     mqPutMsg          - Put a message to an open queue using MQPUT
+     mqUpdateCtrlMsg   - Replace a control message under a unit of work
      mqInquireErrorLog - Retrieve error log entries using PCF
 */
 
@@ -634,4 +635,100 @@ int mqInquireErrorLog ( mqconn_t    *conn        , // connection handler
     if (repBag  != MQHB_UNUSABLE_HBAG) mqDeleteBag (&repBag, &cc, &rc);
 
   return sysRc;
+}
+
+
+/******************************************************************************/
+/* Update a control message under a single unit of work.                      */
+/*                                                                            */
+/* Destructively gets the message matching md->CorrelId and puts the new       */
+/* control structure back, so the updated message lands at the end of the     */
+/* queue with a refreshed expiry.  Both operations run under syncpoint:       */
+/* either the replacement becomes visible, or nothing is changed.             */
+/******************************************************************************/
+int mqUpdateCtrlMsg (mqconn_t *conn, MQHOBJ qObj, const MQMD *md,
+                     void *msg, MQLONG msgLen)
+{
+  MQMD   getMd   = {MQMD_DEFAULT};
+  MQMD   putMd   = {MQMD_DEFAULT};
+  MQGMO  gmo     = {MQGMO_DEFAULT};
+  MQPMO  pmo     = {MQPMO_DEFAULT};
+  MQLONG dataLen = 0;
+  MQLONG cc, rc;
+  char   discard[1];  // old body is replaced, so it is truncated away
+
+  // -------------------------------------------------------
+  // Remove the current version of the message under syncpoint.
+  // -------------------------------------------------------
+  memcpy (getMd.CorrelId, md->CorrelId, sizeof (getMd.CorrelId));
+
+  gmo.Options      = MQGMO_SYNCPOINT | MQGMO_FAIL_IF_QUIESCING
+                   | MQGMO_ACCEPT_TRUNCATED_MSG;
+  gmo.MatchOptions = MQMO_MATCH_CORREL_ID;
+
+  MQGET (conn->hConn, qObj, &getMd, &gmo,
+         (MQLONG) sizeof (discard), discard, &dataLen, &cc, &rc);
+
+  switch (rc)
+  {
+    case MQRC_NONE:
+    case MQRC_TRUNCATED_MSG_ACCEPTED:
+      break;
+    default:
+      fprintf (stderr, "MQGET control message failed: CC=%d RC=%d %s\n",
+               (int) cc, (int) rc, mqrc2str (rc));
+      goto _backout;
+  }
+
+  // -------------------------------------------------------
+  // Put the updated control structure back to the queue.
+  // MQMD.Expiry is in tenths of a second; MQ_DISERR_CTRL_MSG_EXPIRY is in days.
+  // -------------------------------------------------------
+  memcpy (putMd.CorrelId, md->CorrelId, sizeof (putMd.CorrelId));
+  putMd.Expiry = MQ_DISERR_CTRL_MSG_EXPIRY * 24 * 60 * 60 * 10;
+
+  pmo.Options = MQPMO_SYNCPOINT | MQPMO_FAIL_IF_QUIESCING | MQPMO_NEW_MSG_ID;
+
+  MQPUT (conn->hConn, qObj, &putMd, &pmo, msgLen, msg, &cc, &rc);
+
+  switch (rc)
+  {
+    case MQRC_NONE:
+      break;
+    default:
+      fprintf (stderr, "MQPUT control message failed: CC=%d RC=%d %s\n",
+               (int) cc, (int) rc, mqrc2str (rc));
+      goto _backout;
+  }
+
+  // -------------------------------------------------------
+  // Commit the unit of work.
+  // -------------------------------------------------------
+  MQCMIT (conn->hConn, &cc, &rc);
+
+  switch (rc)
+  {
+    case MQRC_NONE:
+      break;
+    default:
+      fprintf (stderr, "MQCMIT failed: CC=%d RC=%d %s\n",
+               (int) cc, (int) rc, mqrc2str (rc));
+      goto _backout;
+  }
+
+  return MQRC_NONE;
+
+  _backout:
+  {
+    MQLONG failedRc = rc;
+    MQLONG backCc, backRc;
+
+    MQBACK (conn->hConn, &backCc, &backRc);
+
+    if (backRc != MQRC_NONE)
+      fprintf (stderr, "MQBACK failed: CC=%d RC=%d %s\n",
+               (int) backCc, (int) backRc, mqrc2str (backRc));
+
+    return failedRc;
+  }
 }
