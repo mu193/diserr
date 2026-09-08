@@ -12,9 +12,10 @@
      mqDisconnect       - Disconnect from a queue manager
      mqOpenQueue        - Open a queue
      mqCloseQueue       - Close a queue opened with mqOpenQueue
-      mqPutMsg           - Put a message to an open queue
+     mqPutMsg           - Put a message to an open queue
      mqInquireErrorLog  - Inquire error log entries from queue manager
      mqUpdateCtrlMsg    - Replace a control message under syncpoint
+     mqRequeueCtrlMsg   - Requeue a control message at the tail of the queue
 */
 
 #ifndef MQUTIL_H
@@ -23,6 +24,16 @@
 #include <stdio.h>
 #include <cmqc.h>
 #include "cmdline.h"
+
+/******************************************************************************/
+/*                               D E F I N E S                                */
+/******************************************************************************/
+
+// ---------------------------------------------------------
+// Dynamic reply queue prefix and command server reply timeout.
+// ---------------------------------------------------------
+#define MQ_DISERR_REPLY        "MONITOR.DISERR.REPLY.*"
+#define MQ_DISERR_CMD_TIMEOUT  10  // mqExecute reply wait in seconds
 
 /******************************************************************************/
 /*                               T Y P E S                                    */
@@ -65,6 +76,9 @@ int         mqInquireErrorLog  (mqconn_t    *conn        , // connection handler
                                 formatType_t format      , // output format: text or json
                                       char *lastTime    ); // returns the last log entry time in ISO format
 int         mqUpdateCtrlMsg    (mqconn_t *conn, MQHOBJ qObj,
+                                const MQMD *md,
+                                void *msg, MQLONG msgLen);
+int         mqRequeueCtrlMsg   (mqconn_t *conn, MQHOBJ qObj,
                                 const MQMD *md,
                                 void *msg, MQLONG msgLen);
 

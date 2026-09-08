@@ -2,11 +2,31 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Debug diserr",
+            "name": "Debug diserr -m PYD1",
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/bin/diserr",
             "args": ["-m", "PYD1", "-f", "json"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "build"
+        },
+        {
+            "name": "Debug diserr -d",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/bin/diserr",
+            "args": ["-d"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],

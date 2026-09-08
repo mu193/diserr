@@ -13,6 +13,7 @@
      mqCloseQueue      - Close a queue opened with mqOpenQueue
     mqPutMsg          - Put a message to an open queue using MQPUT
      mqUpdateCtrlMsg   - Replace a control message under a unit of work
+     mqRequeueCtrlMsg  - Requeue a control message at the tail of the queue
      mqInquireErrorLog - Retrieve error log entries using PCF
 */
 
@@ -39,7 +40,6 @@
 /******************************************************************************/
 #define MQ_1MB_BUF_LEN         (1024 * 1024) // 1MB read buffer for PCF replies
 #define MQ_ADMIN_COMMAND_QUEUE "SYSTEM.ADMIN.COMMAND.QUEUE"
-#define MQ_DISERR_REPLY        "MONITOR.DISERR.REPLY.*"
 
 /******************************************************************************/
 /*                               G L O B A L S                                */
@@ -306,6 +306,7 @@ int mqInquireErrorLog ( mqconn_t    *conn        , // connection handler
 
   MQHBAG  cmdBag = MQHB_UNUSABLE_HBAG;
   MQHBAG  repBag = MQHB_UNUSABLE_HBAG;
+  MQHBAG  optBag = MQHB_UNUSABLE_HBAG;
   MQLONG  cc, rc;
   int     sysRc  = 0;
 
@@ -388,6 +389,35 @@ int mqInquireErrorLog ( mqconn_t    *conn        , // connection handler
   }
 
   // -------------------------------------------------------
+  // Create options bag holding the reply wait interval.
+  // -------------------------------------------------------
+  mqCreateBag (MQCBO_NONE, &optBag, &cc, &rc);
+  switch (rc)
+  {
+    case MQRC_NONE:
+      break;
+    default:
+      fprintf (stderr, "mqCreateBag (options) failed: %d %s\n",
+               (int) rc, mqrc2str (rc));
+      sysRc = rc;
+      goto _cleanup;
+  }
+
+  // MQIACF_WAIT_INTERVAL is in milliseconds.
+  mqAddInteger (optBag, MQIACF_WAIT_INTERVAL, MQ_DISERR_CMD_TIMEOUT * 1000,
+                &cc, &rc);
+  switch (rc)
+  {
+    case MQRC_NONE:
+      break;
+    default:
+      fprintf (stderr, "mqAddInteger (wait interval) failed: %d %s\n",
+               (int) rc, mqrc2str (rc));
+      sysRc = rc;
+      goto _cleanup;
+  }
+
+  // -------------------------------------------------------
   // Open SYSTEM.ADMIN.COMMAND.QUEUE for PCF execution.
   // If -r / --remQmgr was specified, the queue is opened
   // with ObjectQMgrName set to that remote queue manager,
@@ -445,7 +475,7 @@ int mqInquireErrorLog ( mqconn_t    *conn        , // connection handler
   // -------------------------------------------------------
   mqExecute( conn->hConn            ,
              MQCMD_INQUIRE_ERROR_LOG,
-             MQHB_NONE              ,
+             optBag                 ,
              cmdBag                 ,
              repBag                 ,
              hAdminQ                ,
@@ -496,8 +526,8 @@ int mqInquireErrorLog ( mqconn_t    *conn        , // connection handler
           break;
 
         default:                          // Genuine command server error.
-          fprintf (stderr, "mqExecute failed: command server cc=%d rc=%d %s\n",
-                   (int) cmdSrvCC, (int) cmdSrvRC, mqrc2str (cmdSrvRC));
+          fprintf (stderr, "mqExecute failed: %d(%s) for >%s<\n",
+                   (int) cmdSrvRC, mqrc2str (cmdSrvRC), qmgr);
           sysRc = cmdSrvRC;
           break;
       }
@@ -633,6 +663,7 @@ int mqInquireErrorLog ( mqconn_t    *conn        , // connection handler
     if (hAdminQ != MQHO_NONE)          mqCloseQueue  (conn, &hAdminQ);
     if (cmdBag  != MQHB_UNUSABLE_HBAG) mqDeleteBag (&cmdBag, &cc, &rc);
     if (repBag  != MQHB_UNUSABLE_HBAG) mqDeleteBag (&repBag, &cc, &rc);
+    if (optBag  != MQHB_UNUSABLE_HBAG) mqDeleteBag (&optBag, &cc, &rc);
 
   return sysRc;
 }
@@ -641,7 +672,7 @@ int mqInquireErrorLog ( mqconn_t    *conn        , // connection handler
 /******************************************************************************/
 /* Update a control message under a single unit of work.                      */
 /*                                                                            */
-/* Destructively gets the message matching md->CorrelId and puts the new       */
+/* Destructively gets the message matching md->CorrelId and puts the new      */
 /* control structure back, so the updated message lands at the end of the     */
 /* queue with a refreshed expiry.  Both operations run under syncpoint:       */
 /* either the replacement becomes visible, or nothing is changed.             */
@@ -690,6 +721,95 @@ int mqUpdateCtrlMsg (mqconn_t *conn, MQHOBJ qObj, const MQMD *md,
   pmo.Options = MQPMO_SYNCPOINT | MQPMO_FAIL_IF_QUIESCING | MQPMO_NEW_MSG_ID;
 
   MQPUT (conn->hConn, qObj, &putMd, &pmo, msgLen, msg, &cc, &rc);
+
+  switch (rc)
+  {
+    case MQRC_NONE:
+      break;
+    default:
+      fprintf (stderr, "MQPUT control message failed: CC=%d RC=%d %s\n",
+               (int) cc, (int) rc, mqrc2str (rc));
+      goto _backout;
+  }
+
+  // -------------------------------------------------------
+  // Commit the unit of work.
+  // -------------------------------------------------------
+  MQCMIT (conn->hConn, &cc, &rc);
+
+  switch (rc)
+  {
+    case MQRC_NONE:
+      break;
+    default:
+      fprintf (stderr, "MQCMIT failed: CC=%d RC=%d %s\n",
+               (int) cc, (int) rc, mqrc2str (rc));
+      goto _backout;
+  }
+
+  return MQRC_NONE;
+
+  _backout:
+  {
+    MQLONG failedRc = rc;
+    MQLONG backCc, backRc;
+
+    MQBACK (conn->hConn, &backCc, &backRc);
+
+    if (backRc != MQRC_NONE)
+      fprintf (stderr, "MQBACK failed: CC=%d RC=%d %s\n",
+               (int) backCc, (int) backRc, mqrc2str (backRc));
+
+    return failedRc;
+  }
+}
+
+
+/******************************************************************************/
+/* Requeue a control message at the tail of the queue.                        */
+/*                                                                            */
+/* Gets the message matching md->CorrelId and puts it back unchanged, so it   */
+/* moves behind the other entries and the next one is processed on the        */
+/* following pass.  The descriptor returned by MQGET is reused for the MQPUT, */
+/* which keeps MsgId, priority, persistence and the remaining expiry.  Both   */
+/* operations run under syncpoint.                                            */
+/******************************************************************************/
+int mqRequeueCtrlMsg (mqconn_t *conn, MQHOBJ qObj, const MQMD *md,
+                      void *msg, MQLONG msgLen)
+{
+  MQMD   msgMd   = {MQMD_DEFAULT};
+  MQGMO  gmo     = {MQGMO_DEFAULT};
+  MQPMO  pmo     = {MQPMO_DEFAULT};
+  MQLONG dataLen = 0;
+  MQLONG cc, rc;
+
+  // -------------------------------------------------------
+  // Remove the message under syncpoint, keeping its body.
+  // -------------------------------------------------------
+  memcpy (msgMd.CorrelId, md->CorrelId, sizeof (msgMd.CorrelId));
+
+  gmo.Options      = MQGMO_SYNCPOINT | MQGMO_FAIL_IF_QUIESCING;
+  gmo.MatchOptions = MQMO_MATCH_CORREL_ID;
+
+  MQGET (conn->hConn, qObj, &msgMd, &gmo, msgLen, msg, &dataLen, &cc, &rc);
+
+  switch (rc)
+  {
+    case MQRC_NONE:
+      break;
+    default:
+      fprintf (stderr, "MQGET control message failed: CC=%d RC=%d %s\n",
+               (int) cc, (int) rc, mqrc2str (rc));
+      goto _backout;
+  }
+
+  // -------------------------------------------------------
+  // Put it back with the descriptor returned by MQGET, whose
+  // Expiry now holds the remaining lifetime of the message.
+  // -------------------------------------------------------
+  pmo.Options = MQPMO_SYNCPOINT | MQPMO_FAIL_IF_QUIESCING;
+
+  MQPUT (conn->hConn, qObj, &msgMd, &pmo, dataLen, msg, &cc, &rc);
 
   switch (rc)
   {

@@ -94,8 +94,8 @@ int addQmgr (mqconn_t *conn)
 
     if (mqrc != MQRC_NONE)
     {
-      fprintf (stderr, "MQGET browse failed: CC=%d RC=%d %s\n", (int) mqcc, 
-                                                                (int) mqrc, mqrc2str (mqrc));
+      fprintf (stderr, "MQGET browse failed: RC=%d %s\n", (int) mqrc, 
+                                                          mqrc2str (mqrc));
       rc = -1;
       goto _door;
     }
@@ -147,11 +147,11 @@ int listQmgr (mqconn_t *conn)
   // -------------------------------------------------------
   // Open control queue for browse.
   // -------------------------------------------------------
-  mqrc = mqOpenQueue (conn,
-                     MQ_DISERR_CTRL_QUEUE,
-                     NULL,
-                     MQOO_BROWSE | MQOO_INQUIRE | MQOO_FAIL_IF_QUIESCING,
-                     &hCtrlQ);
+  mqrc = mqOpenQueue( conn                ,
+                      MQ_DISERR_CTRL_QUEUE,
+                      NULL                ,
+                      MQOO_BROWSE | MQOO_INQUIRE | MQOO_FAIL_IF_QUIESCING,
+                      &hCtrlQ    );
   if (mqrc != MQRC_NONE)
   {
     fprintf (stderr, "mqOpenQueue browse failed: RC=%d %s\n", (int) mqrc, mqrc2str (mqrc));
@@ -310,9 +310,9 @@ int daemonize (mqconn_t *conn)
   // -------------------------------------------------------
   // open control queue.
   // -------------------------------------------------------
-  mqrc = mqOpenQueue( conn              ,
+  mqrc = mqOpenQueue( conn                ,
                       MQ_DISERR_CTRL_QUEUE,
-                      NULL              ,
+                      NULL                ,
                       MQOO_INPUT_SHARED | MQOO_OUTPUT          |\
                       MQOO_BROWSE       | MQOO_FAIL_IF_QUIESCING,
                       &hCtrlQ          );
@@ -331,8 +331,8 @@ int daemonize (mqconn_t *conn)
     // -----------------------------------------------------
     // browse first message in the control queue 
     // -----------------------------------------------------
-    MQMD md = {MQMD_DEFAULT};
-    MQGMO gmo = {MQGMO_DEFAULT};
+    MQMD   md = {MQMD_DEFAULT};
+    MQGMO  gmo = {MQGMO_DEFAULT};
     MQLONG mqcc, dataLen;
   
     char amqerrFile[MQLOGCTL_LOG_FILENAME_LEN + 1];
@@ -392,40 +392,41 @@ int daemonize (mqconn_t *conn)
                                   NULL         ,
                                   FMT_JSON     ,
                                   ctrlMsg.lastLogEntry );
-        if (mqrc != MQRC_NONE)
+        switch( mqrc )
         {
-          rc = -1;
-          break;
-        }
-      }
-
-      // ---------------------------------------------------
-      // consume a message identified by md->correlationId
-      // put message with new controlStruct back to the control q
-      // do both actions in a transactional manner
-      // ---------------------------------------------------
-      if (rc == 0)
-      {
-        mqrc = mqUpdateCtrlMsg (conn, hCtrlQ, &md, &ctrlMsg, sizeof (ctrlMsg));
-
-        switch (mqrc)
-        {
-          case MQRC_NONE:   // Success - continue.
-            break;          //
-          default:          // Error - exit with failure.
+          case MQRC_NONE:             // Success - persist the progress.
+            // -----------------------------------------------
+            // consume a message identified by md->correlationId
+            // put message with new controlStruct back to the control q
+            // do both actions in a transactional manner
+            // -----------------------------------------------
+            ctrlMsg.retryCount = 0;
+            if (mqUpdateCtrlMsg (conn, hCtrlQ, &md, &ctrlMsg,
+                                 sizeof (ctrlMsg)) != MQRC_NONE)
+              rc = -1;
+            break;
+          case MQRC_NO_MSG_AVAILABLE: 
+            // No reply from command server - skip.
+            // requeue the control message at the tail of the queue
+            ctrlMsg.retryCount++;
+            ctrlMsg.collectionStart = time(NULL) + 100 + (ctrlMsg.retryCount * 30);
+            if (mqRequeueCtrlMsg (conn, hCtrlQ, &md, &ctrlMsg,
+                                   sizeof (ctrlMsg)) != MQRC_NONE)
+              rc = -1;
+            break;                    //
+          default:                    // Error - stop inquiring.
             rc = -1;
             break;
         }
+
+        if( rc != 0 )
+          break;  // leave the for loop; the switch break only left the switch
+
+        // pace the PCF inquiries so the command server is not flooded
+        struct timespec pause = {.tv_sec = 0, .tv_nsec = 100000000L};
+        nanosleep (&pause, NULL);
       }
     }
-    fclose(gRealStdout);
-
-/* to be improved
-  - if last time is not set -> initial run 
-    |-> get amqerr3, amqerr1 and amqerr1 
-  - output in json
-  - redirect to a log file
-*/
   }
 
   // -------------------------------------------------------
@@ -442,6 +443,12 @@ int daemonize (mqconn_t *conn)
   }
 
   _door:
+
+  if (gRealStdout != NULL)
+  {
+    fclose (gRealStdout);
+    gRealStdout = NULL;
+  }
 
   return rc;
 }
