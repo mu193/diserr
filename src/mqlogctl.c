@@ -401,19 +401,23 @@ int daemonize (mqconn_t *conn)
             // do both actions in a transactional manner
             // -----------------------------------------------
             ctrlMsg.retryCount = 0;
-            if (mqUpdateCtrlMsg (conn, hCtrlQ, &md, &ctrlMsg,
-                                 sizeof (ctrlMsg)) != MQRC_NONE)
+            if( mqUpdateCtrlMsg (conn, hCtrlQ, &md, &ctrlMsg,
+                                 sizeof (ctrlMsg)) != MQRC_NONE )
               rc = -1;
             break;
+
           case MQRC_NO_MSG_AVAILABLE: 
-            // No reply from command server - skip.
+            // -----------------------------------------------
+            // No reply from command server 
             // requeue the control message at the tail of the queue
+            // -----------------------------------------------
             ctrlMsg.retryCount++;
             ctrlMsg.collectionStart = time(NULL) + 100 + (ctrlMsg.retryCount * 30);
-            if (mqRequeueCtrlMsg (conn, hCtrlQ, &md, &ctrlMsg,
-                                   sizeof (ctrlMsg)) != MQRC_NONE)
+            if( mqRequeueCtrlMsg( conn, hCtrlQ, &md, &ctrlMsg,
+                                  sizeof (ctrlMsg)) != MQRC_NONE )
               rc = -1;
-            break;                    //
+            break;                    
+
           default:                    // Error - stop inquiring.
             rc = -1;
             break;
